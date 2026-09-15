@@ -33,7 +33,7 @@
   // MS_PRIVATE_KEY_PKCS8 and SESSION_SECRET are added as encrypted secrets
   // via the Cloudflare dashboard instead, never committed to the repo.
   "vars": {
-    "MS_CLIENT_ID": "REPLACE_WITH_APPLICATION_CLIENT_ID",
+    "MS_CLIENT_ID": "b4d0b124-c075-4387-9e07-4c0d1bf9a4d2",
     "MS_REDIRECT_URI": "https://outreach.tsgroup.cloud/auth/callback",
     "MS_CERT_THUMBPRINT": "2BCD9F147AA79DDE506190FE7F7E2103054328BF",
     "ALLOWED_EMAIL_DOMAINS": "tapflopumps.co.uk,sychem.co.uk"
