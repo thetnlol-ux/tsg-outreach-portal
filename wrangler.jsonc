@@ -5,9 +5,14 @@
 
   // Everything the router (src/index.js) doesn't recognise as an API route
   // falls through to whatever's in /public - just index.html for now.
+  // run_worker_first is required here: without it Cloudflare serves a
+  // matching static asset (index.html, on almost every request) straight
+  // from the asset store and never invokes the Worker at all - which
+  // means the password check in src/index.js would never run.
   "assets": {
     "directory": "./public",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    "run_worker_first": true
   },
 
   "d1_databases": [
