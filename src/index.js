@@ -11,11 +11,19 @@ import { handleDisconnectSalesforce, handleDisconnectOutlook } from "./routes/di
 import { verifySession, readCookie } from "./shared/session.js";
 
 // Small router: /auth/*, /connect/* and /api/* are the only real logic
-// here. "/dashboard" explicitly serves public/dashboard.html (the actual
-// app); everything else - "/" (the public landing page) included - falls
-// straight through to Cloudflare's own static asset server. Every request
-// is gated by the signed-in-session check first, except "/" and the auth
+// here. Everything else - "/" (the public landing page), "/dashboard"
+// (Cloudflare serves public/dashboard.html for this automatically - its
+// own clean-URL handling, no rewrite needed here) - falls straight
+// through to Cloudflare's own static asset server. Every request is
+// gated by the signed-in-session check first, except "/" and the auth
 // routes themselves (they're what establishes it).
+//
+// Do NOT special-case "/dashboard" here to fetch "/dashboard.html"
+// explicitly - Cloudflare's asset server treats that .html URL as a
+// non-canonical alias of "/dashboard" and 307-redirects it back to
+// "/dashboard", which this router was also intercepting, producing an
+// infinite redirect loop (confirmed for real - see git history for the
+// exact reproduction).
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -51,10 +59,6 @@ export default {
       if (request.method === "GET") return handleGetState(request, env);
       if (request.method === "POST") return handleSaveState(request, env);
       return new Response("Method not allowed", { status: 405 });
-    }
-
-    if (url.pathname === "/dashboard") {
-      return env.ASSETS.fetch(new Request(new URL("/dashboard.html", url), request));
     }
 
     if (url.pathname === "/api/me") {
