@@ -12,7 +12,12 @@ export async function requireAuth(request, env) {
 
   const token = readCookie(request, "session");
   const session = await verifySession(token, env.SESSION_SECRET);
-  if (session) return null;
+  // A cookie signed before a field was added to the session payload (e.g.
+  // userId, added once Salesforce/Outlook connections needed one) still
+  // verifies fine - it's just missing that field. Treating that as
+  // unauthenticated forces one automatic re-login instead of silently
+  // breaking whatever depends on the new field.
+  if (session && session.userId) return null;
 
   // An API call gets a plain 401 (the page's own fetch/XHR calls can't
   // follow a redirect into an HTML sign-in page usefully); a normal page
