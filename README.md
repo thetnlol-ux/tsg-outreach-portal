@@ -26,8 +26,22 @@ Separate from, and does not touch, the `tsg-portal` repo/Worker/database.
   Microsoft account gets in — see `ALLOWED_EMAIL_DOMAINS` in
   `wrangler.jsonc`. No separate users/companies table; this portal is one
   shared board for both companies' reps, not per-company data isolation.
-- `migrations/0001_init.sql` — the one D1 table this needs. Already applied
-  to the `tsg-outreach-portal-db` database created for this project.
+- `src/routes/salesforce-connect.js`, `salesforce-callback.js`,
+  `src/shared/salesforce.js`, `salesforceOrgs.js` — per-person "Connect
+  Salesforce", same OAuth2 + PKCE pattern `tsg-portal` uses. Tapflo and
+  Sychem are separate Salesforce orgs with their own dedicated Connected
+  Apps (not `tsg-portal`'s); which one a person lands on is resolved from
+  their sign-in email domain, not a choice they make.
+- `src/routes/outlook-connect.js`, `outlook-callback.js` — per-person
+  "Connect Outlook", reusing the same Entra app and certificate as sign-in
+  (wider scopes, its own redirect address).
+- `src/routes/disconnect.js` — lets a person redo either connection from
+  scratch if it ends up pointing at the wrong account.
+- `migrations/0001_init.sql`, `0002_connections.sql` — the D1 tables this
+  needs (`portal_state`, plus `users`/`salesforce_connections`/
+  `outlook_connections`/`activity_log` for the API connections). Already
+  applied to the `tsg-outreach-portal-db` database created for this
+  project.
 
 ## What changed from the original artifact
 
@@ -49,7 +63,12 @@ lead data itself — is untouched.
 - **"Refresh leads" and lead enrichment are still a manual, Claude-in-the-
   loop workflow.** The board's refresh button copies a prompt to the
   clipboard for pasting into a separate Claude chat that has Salesforce/
-  Outlook/ZoomInfo connectors — there's no code here doing live enrichment.
+  Outlook/ZoomInfo connectors — there's no code here doing live enrichment
+  yet. Salesforce and Outlook are now connected per-person (see above),
+  but nothing in the dashboard's own logic calls them yet — that's the
+  next step, once there's a concrete feature to point them at (e.g. a live
+  "already emailed"/"already a customer" check). ZoomInfo and Lead
+  Forensics aren't connected at all yet.
   That prompt's final instruction now tells you to bring the result back
   to this repo (paste the updated `tapfloLeads`/`sychemLeads`/
   `MAILSHOT_SENT`/`NEVER_CONTACT` into the portal, or hand it to Claude
@@ -90,3 +109,26 @@ This portal has its own app registration, separate from `tsg-portal`'s:
    already in `wrangler.jsonc` as `MS_CERT_THUMBPRINT`.
 4. `ALLOWED_EMAIL_DOMAINS` in `wrangler.jsonc` controls who's let in after
    signing in — currently `tapflopumps.co.uk,sychem.co.uk`.
+5. For **Connect Outlook** (reuses this same app): App registration →
+   **API permissions** → Add a permission → Microsoft Graph → Delegated →
+   add `Mail.Read` and `Calendars.Read`. Grant admin consent if your
+   tenant requires it. Also add a second **Web** redirect URI:
+   `https://outreach.tsgroup.cloud/connect/outlook/callback`.
+
+## Salesforce connection setup (per org)
+
+Tapflo and Sychem each need their own Salesforce Connected App, in their
+own org:
+
+1. Salesforce Setup → App Manager → **New Connected App**.
+2. Enable OAuth Settings. Callback URL:
+   `https://outreach.tsgroup.cloud/connect/salesforce/callback` (same URL
+   for both orgs — each org validates it independently).
+3. Selected OAuth Scopes: **Manage user data via APIs (api)** and
+   **Perform requests at any time (refresh_token, offline_access)**.
+4. Save, then copy the **Consumer Key** and **Consumer Secret**.
+5. Put the Consumer Key into `SALESFORCE_CLIENT_ID_TAPFLO` (or `_SYCHEM`)
+   in `wrangler.jsonc`, the org's Salesforce login domain (e.g.
+   `yourorg.my.salesforce.com`) into `SALESFORCE_DOMAIN_TAPFLO` (or
+   `_SYCHEM`), and add the Consumer Secret as an encrypted Cloudflare
+   secret named `SALESFORCE_CLIENT_SECRET_TAPFLO` (or `_SYCHEM`).

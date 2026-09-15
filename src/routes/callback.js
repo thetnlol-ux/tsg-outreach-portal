@@ -61,6 +61,7 @@ export async function handleCallback(request, env) {
   const email = (claims.preferred_username || claims.email || "").toLowerCase();
   const displayName = claims.name || email;
   const emailDomain = email.split("@")[1] || "";
+  const oid = claims.oid;
 
   const allowed = allowedDomains(env);
   if (allowed.length && !allowed.includes(emailDomain)) {
@@ -71,7 +72,26 @@ export async function handleCallback(request, env) {
     );
   }
 
-  const session = await createSession({ email, displayName }, env.SESSION_SECRET);
+  // Salesforce/Outlook connections (added once this portal linked those
+  // APIs) key off a stable numeric user id rather than email, so this
+  // upserts a `users` row the same way tsg-portal's callback does.
+  let user = await env.DB.prepare("SELECT id FROM users WHERE ms_oid = ?").bind(oid).first();
+  if (!user) {
+    await env.DB.prepare(
+      "INSERT INTO users (ms_oid, email, display_name, created_at, last_login_at) VALUES (?, ?, ?, datetime('now'), datetime('now'))"
+    )
+      .bind(oid, email, displayName)
+      .run();
+    user = await env.DB.prepare("SELECT id FROM users WHERE ms_oid = ?").bind(oid).first();
+  } else {
+    await env.DB.prepare(
+      "UPDATE users SET last_login_at = datetime('now'), email = ?, display_name = ? WHERE id = ?"
+    )
+      .bind(email, displayName, user.id)
+      .run();
+  }
+
+  const session = await createSession({ userId: user.id, email, displayName }, env.SESSION_SECRET);
 
   const headers = new Headers({ Location: "/" });
   headers.append("Set-Cookie", `session=${session}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=43200`);
