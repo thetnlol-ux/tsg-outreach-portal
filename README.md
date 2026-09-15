@@ -43,6 +43,12 @@ Separate from, and does not touch, the `tsg-portal` repo/Worker/database.
 - `src/routes/outlook-connect.js`, `outlook-callback.js` — per-person
   "Connect Outlook", reusing the same Entra app and certificate as sign-in
   (wider scopes, its own redirect address).
+- `src/routes/admin.js` — the Control Centre at `/admin`: every user,
+  whether they've connected Salesforce/Outlook, and recent activity. Same
+  oversight idea as `tsg-portal`'s `/admin`, but access is a plain email
+  allowlist (`ADMIN_EMAILS` in `wrangler.jsonc`) rather than a role
+  column, since this portal has no users/roles table. Admins get a
+  "Control Centre" link on `/dashboard`.
 - `src/routes/disconnect.js` — lets a person redo either connection from
   scratch if it ends up pointing at the wrong account.
 - `migrations/0001_init.sql`, `0002_connections.sql` — the D1 tables this

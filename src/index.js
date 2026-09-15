@@ -4,6 +4,7 @@ import { handleLogin } from "./routes/login.js";
 import { handleCallback } from "./routes/callback.js";
 import { handleLogout } from "./routes/logout.js";
 import { handleDashboard } from "./routes/dashboard.js";
+import { handleAdmin } from "./routes/admin.js";
 import { handleSalesforceConnect } from "./routes/salesforce-connect.js";
 import { handleSalesforceCallback } from "./routes/salesforce-callback.js";
 import { handleOutlookConnect } from "./routes/outlook-connect.js";
@@ -39,6 +40,8 @@ export default {
     switch (url.pathname) {
       case "/dashboard":
         return handleDashboard(request, env);
+      case "/admin":
+        return handleAdmin(request, env);
       case "/connect/salesforce":
         return handleSalesforceConnect(request, env);
       case "/connect/salesforce/callback":

@@ -1,4 +1,5 @@
 import { verifySession, readCookie } from "../shared/session.js";
+import { isAdmin } from "./admin.js";
 
 // The landing spot right after signing in - shows connection status for
 // Salesforce/Outlook with a clear Connect/Disconnect button for each
@@ -106,6 +107,7 @@ export async function handleDashboard(request, env) {
     <a class="open-desk" href="/app">Open Outreach Desk →</a>
 
     <div class="foot">
+      ${isAdmin(env, session.email) ? '<a class="btn2 btn2-ghost" href="/admin">Control Centre</a>' : ""}
       <a class="btn2 btn2-ghost" href="/auth/logout">Sign out</a>
     </div>
   </div>
