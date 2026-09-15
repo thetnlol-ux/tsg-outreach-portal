@@ -9,11 +9,19 @@ Separate from, and does not touch, the `tsg-portal` repo/Worker/database.
 
 ## How it's put together
 
-- `public/index.html` — the dashboard itself. Mostly unchanged from the
-  original artifact; the one functional change is how it saves edits (see
-  below).
-- `src/index.js` — the Worker: a tiny router for `/api/state`, everything
-  else falls through to the static `public/` files.
+- `public/index.html` — the public landing page ("Sign in with Microsoft"),
+  same pattern as `tsg-portal`'s.
+- `src/routes/dashboard.js` — server-rendered hub page at `/dashboard`,
+  shown right after signing in: Connect/Disconnect status for Salesforce
+  and Outlook, plus a button into the actual app. Same card design as
+  `tsg-portal`'s own `/dashboard`.
+- `public/app.html` — the outreach desk itself (mailshot tracking,
+  follow-up stages, call logging, rep performance), served at `/app`.
+  Mostly unchanged from the original artifact; the one functional change
+  is how it saves edits (see below).
+- `src/index.js` — the Worker: a tiny router for `/dashboard`, `/auth/*`,
+  `/connect/*` and `/api/*`; everything else ("/" and "/app") falls
+  through to the static `public/` files as-is.
 - `src/state.js` — reads/writes the portal's editable state (leads,
   mailshot-sent flags, never-contact list) as one JSON blob in D1, with
   optimistic-concurrency version checks.

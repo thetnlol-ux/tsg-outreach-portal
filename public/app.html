@@ -2526,14 +2526,8 @@ function renderFollowUpList(){
   const el = document.getElementById('whoAmI');
   if (!el) return;
   if (__WHOAMI__ && __WHOAMI__.email) {
-    const sfLink = __WHOAMI__.salesforceConnected
-      ? 'Salesforce connected &middot; <a href="/connect/salesforce/disconnect" style="color:inherit;">disconnect</a>'
-      : '<a href="/connect/salesforce" style="color:inherit;">Connect Salesforce</a>';
-    const olLink = __WHOAMI__.outlookConnected
-      ? 'Outlook connected &middot; <a href="/connect/outlook/disconnect" style="color:inherit;">disconnect</a>'
-      : '<a href="/connect/outlook" style="color:inherit;">Connect Outlook</a>';
     el.innerHTML = (__WHOAMI__.displayName || __WHOAMI__.email) +
-      ' &middot; ' + sfLink + ' &middot; ' + olLink +
+      ' &middot; <a href="/dashboard" style="color:inherit;">Connections</a>' +
       ' &middot; <a href="/auth/logout" style="color:inherit;">Sign out</a>';
   }
 })();
