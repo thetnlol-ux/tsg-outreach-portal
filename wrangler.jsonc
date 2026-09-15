@@ -40,10 +40,11 @@
     "MS_CERT_THUMBPRINT": "2BCD9F147AA79DDE506190FE7F7E2103054328BF",
     "ALLOWED_EMAIL_DOMAINS": "tapflopumps.co.uk,sychem.co.uk",
 
+    // Sychem isn't wired up yet (licensing) - only Tapflo's vars are set,
+    // so resolveSalesforceOrg() cleanly reports "not set up yet" for a
+    // Sychem user rather than a Connected App that doesn't really exist.
     "SALESFORCE_REDIRECT_URI": "https://outreach.tsgroup.cloud/connect/salesforce/callback",
-    "SALESFORCE_DOMAIN_TAPFLO": "REPLACE_WITH_TAPFLO_SALESFORCE_LOGIN_DOMAIN",
-    "SALESFORCE_CLIENT_ID_TAPFLO": "REPLACE_WITH_TAPFLO_CONSUMER_KEY",
-    "SALESFORCE_DOMAIN_SYCHEM": "REPLACE_WITH_SYCHEM_SALESFORCE_LOGIN_DOMAIN",
-    "SALESFORCE_CLIENT_ID_SYCHEM": "REPLACE_WITH_SYCHEM_CONSUMER_KEY"
+    "SALESFORCE_DOMAIN_TAPFLO": "tapflouk.my.salesforce.com",
+    "SALESFORCE_CLIENT_ID_TAPFLO": "3MVG9sh10GGnD4Dtof_piPO7oYvc1VuielIB9Rh7uTCVK7fPB1pE0JHQ0vMYnFsgG4KeL.SI7x.8WAmfO7Rsk"
   }
 }
