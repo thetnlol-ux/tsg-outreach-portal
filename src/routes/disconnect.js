@@ -14,7 +14,7 @@ export async function handleDisconnectSalesforce(request, env) {
   if (error) return error;
   await env.DB.prepare("DELETE FROM salesforce_connections WHERE user_id = ?").bind(session.userId).run();
   await env.DB.prepare("INSERT INTO activity_log (user_id, event) VALUES (?, 'salesforce_disconnected')").bind(session.userId).run();
-  return new Response(null, { status: 302, headers: { Location: "/" } });
+  return new Response(null, { status: 302, headers: { Location: "/dashboard" } });
 }
 
 export async function handleDisconnectOutlook(request, env) {
@@ -22,5 +22,5 @@ export async function handleDisconnectOutlook(request, env) {
   if (error) return error;
   await env.DB.prepare("DELETE FROM outlook_connections WHERE user_id = ?").bind(session.userId).run();
   await env.DB.prepare("INSERT INTO activity_log (user_id, event) VALUES (?, 'outlook_disconnected')").bind(session.userId).run();
-  return new Response(null, { status: 302, headers: { Location: "/" } });
+  return new Response(null, { status: 302, headers: { Location: "/dashboard" } });
 }

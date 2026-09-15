@@ -1,10 +1,11 @@
 import { verifySession, readCookie } from "./shared/session.js";
 
-// Every request needs a valid signed session cookie, established by the
-// Microsoft sign-in flow (src/routes/login.js -> .../callback.js). The
-// auth routes themselves are always let through - they're what creates
-// the session in the first place.
-const PUBLIC_PATHS = new Set(["/auth/login", "/auth/callback", "/auth/logout"]);
+// "/" is the public landing page (a branded card with a "Sign in with
+// Microsoft" button, same pattern as tsg-portal) - everything else needs
+// a valid signed session cookie, established by the Microsoft sign-in
+// flow (src/routes/login.js -> .../callback.js). The auth routes
+// themselves are always let through too - they're what creates it.
+const PUBLIC_PATHS = new Set(["/", "/auth/login", "/auth/callback", "/auth/logout"]);
 
 export async function requireAuth(request, env) {
   const url = new URL(request.url);
@@ -21,12 +22,13 @@ export async function requireAuth(request, env) {
 
   // An API call gets a plain 401 (the page's own fetch/XHR calls can't
   // follow a redirect into an HTML sign-in page usefully); a normal page
-  // load gets sent to sign in and back.
+  // load gets sent back to the landing page to sign in properly, same as
+  // tsg-portal's dashboard route does.
   if (url.pathname.startsWith("/api/")) {
     return new Response("Authentication required.", { status: 401 });
   }
   return new Response(null, {
     status: 302,
-    headers: { Location: "/auth/login" },
+    headers: { Location: "/" },
   });
 }

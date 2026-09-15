@@ -93,7 +93,7 @@ export async function handleCallback(request, env) {
 
   const session = await createSession({ userId: user.id, email, displayName }, env.SESSION_SECRET);
 
-  const headers = new Headers({ Location: "/" });
+  const headers = new Headers({ Location: "/dashboard" });
   headers.append("Set-Cookie", `session=${session}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=43200`);
   headers.append("Set-Cookie", "pkce_verifier=; Path=/; Max-Age=0");
   headers.append("Set-Cookie", "oauth_state=; Path=/; Max-Age=0");

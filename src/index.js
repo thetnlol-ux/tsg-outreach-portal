@@ -11,11 +11,11 @@ import { handleDisconnectSalesforce, handleDisconnectOutlook } from "./routes/di
 import { verifySession, readCookie } from "./shared/session.js";
 
 // Small router: /auth/*, /connect/* and /api/* are the only real logic
-// here, everything else (index.html, and anything static added later)
-// falls straight through to Cloudflare's own static asset server. Every
-// request - API and static alike - is gated by the signed-in-session
-// check first, except the auth routes themselves (they're what
-// establishes it).
+// here. "/dashboard" explicitly serves public/dashboard.html (the actual
+// app); everything else - "/" (the public landing page) included - falls
+// straight through to Cloudflare's own static asset server. Every request
+// is gated by the signed-in-session check first, except "/" and the auth
+// routes themselves (they're what establishes it).
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -51,6 +51,10 @@ export default {
       if (request.method === "GET") return handleGetState(request, env);
       if (request.method === "POST") return handleSaveState(request, env);
       return new Response("Method not allowed", { status: 405 });
+    }
+
+    if (url.pathname === "/dashboard") {
+      return env.ASSETS.fetch(new Request(new URL("/dashboard.html", url), request));
     }
 
     if (url.pathname === "/api/me") {

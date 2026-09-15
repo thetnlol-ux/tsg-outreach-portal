@@ -85,7 +85,7 @@ export async function handleSalesforceCallback(request, env) {
     .bind(session.userId)
     .run();
 
-  const headers = new Headers({ Location: "/" });
+  const headers = new Headers({ Location: "/dashboard" });
   headers.append("Set-Cookie", "sf_pkce_verifier=; Path=/; Max-Age=0");
   headers.append("Set-Cookie", "sf_oauth_state=; Path=/; Max-Age=0");
   return new Response(null, { status: 302, headers });
