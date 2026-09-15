@@ -1,0 +1,31 @@
+{
+  "name": "tsg-outreach-portal",
+  "main": "src/index.js",
+  "compatibility_date": "2025-01-01",
+
+  // Everything the router (src/index.js) doesn't recognise as an API route
+  // falls through to whatever's in /public - just index.html for now.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tsg-outreach-portal-db",
+      "database_id": "cd433f1c-967a-4267-ada5-d20452858419"
+    }
+  ],
+
+  // Requires outreach.tsgroup.cloud to already be on this Cloudflare
+  // account's tsgroup.cloud zone (it is - same zone tsg-portal uses).
+  "routes": [
+    { "pattern": "outreach.tsgroup.cloud", "custom_domain": true }
+  ]
+
+  // PORTAL_PASSWORD is added as an encrypted secret via the Cloudflare
+  // dashboard (Workers & Pages -> tsg-outreach-portal -> Settings ->
+  // Variables and Secrets), never committed here. The whole site 401s
+  // until it's set - see README for details.
+}
