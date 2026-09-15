@@ -17,8 +17,15 @@ Separate from, and does not touch, the `tsg-portal` repo/Worker/database.
 - `src/state.js` — reads/writes the portal's editable state (leads,
   mailshot-sent flags, never-contact list) as one JSON blob in D1, with
   optimistic-concurrency version checks.
-- `src/auth.js` — a single shared password (HTTP Basic Auth) gating the
-  whole site. Not real per-user login — see **Known limitations** below.
+- `src/auth.js` — gates every request behind a signed session cookie.
+- `src/routes/login.js`, `callback.js`, `logout.js`, `src/shared/msjwt.js`,
+  `src/shared/session.js` — Microsoft sign-in (Entra ID), same
+  certificate-credential pattern `tsg-portal` uses, against a dedicated
+  app registration (`TSG Outreach Portal`, not `tsg-portal`'s app).
+  Anyone signing in with a `@tapflopumps.co.uk` or `@sychem.co.uk`
+  Microsoft account gets in — see `ALLOWED_EMAIL_DOMAINS` in
+  `wrangler.jsonc`. No separate users/companies table; this portal is one
+  shared board for both companies' reps, not per-company data isolation.
 - `migrations/0001_init.sql` — the one D1 table this needs. Already applied
   to the `tsg-outreach-portal-db` database created for this project.
 
@@ -39,10 +46,6 @@ lead data itself — is untouched.
 
 ## Known limitations / what's still manual
 
-- **Auth is a single shared password**, not the real Microsoft login
-  `tsg-portal` has. Anyone with the password can see and edit all lead
-  data. Set the `PORTAL_PASSWORD` secret before treating this as live —
-  the site 401s on every request until it's set.
 - **"Refresh leads" and lead enrichment are still a manual, Claude-in-the-
   loop workflow.** The board's refresh button copies a prompt to the
   clipboard for pasting into a separate Claude chat that has Salesforce/
@@ -60,13 +63,30 @@ Workers so it builds and deploys on every push:
 
 1. Cloudflare dashboard → Workers & Pages → **Create** → **Import a
    repository**, pick `thetnlol-ux/tsg-outreach-portal`.
-2. Once created, Settings → **Variables and Secrets** → add `PORTAL_PASSWORD`
-   as an encrypted secret (the shared password for the whole site).
-3. Settings → **Domains & Routes** → add the custom domain
+2. Settings → **Domains & Routes** → add the custom domain
    `outreach.tsgroup.cloud` (already declared in `wrangler.jsonc`, but
    Cloudflare Custom Domains sometimes need adding once by hand the first
    time — if the route in `wrangler.jsonc` already claimed it on first
    deploy, this step is a no-op).
+3. Once created, Settings → **Variables and Secrets** → add two encrypted
+   secrets: `MS_PRIVATE_KEY_PKCS8` and `SESSION_SECRET`.
 
 The D1 database (`tsg-outreach-portal-db`) and its one table already exist
 and are wired into `wrangler.jsonc` — nothing to do there.
+
+## Microsoft sign-in setup (Entra ID)
+
+This portal has its own app registration, separate from `tsg-portal`'s:
+
+1. Azure portal → Microsoft Entra ID → App registrations → **New
+   registration**, name `TSG Outreach Portal`, account type "Accounts in
+   any organizational directory (Multitenant)", redirect URI (Web)
+   `https://outreach.tsgroup.cloud/auth/callback`.
+2. Copy the **Application (client) ID** into `MS_CLIENT_ID` in
+   `wrangler.jsonc`.
+3. Certificates & secrets → Certificates → upload the public certificate
+   generated for this app. Its private key (base64 PKCS8) is the
+   `MS_PRIVATE_KEY_PKCS8` secret above; the cert's SHA-1 thumbprint is
+   already in `wrangler.jsonc` as `MS_CERT_THUMBPRINT`.
+4. `ALLOWED_EMAIL_DOMAINS` in `wrangler.jsonc` controls who's let in after
+   signing in — currently `tapflopumps.co.uk,sychem.co.uk`.

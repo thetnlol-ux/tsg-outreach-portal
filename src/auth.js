@@ -1,25 +1,27 @@
-// A single shared password gates the whole site (including the static
-// assets) via HTTP Basic Auth. This is a stopgap, not real per-user login -
-// unlike tsg-portal, this repo has no Microsoft/Salesforce OAuth wired up.
-// Fails closed: until PORTAL_PASSWORD is set as a secret, nothing is
-// served rather than the portal (and its lead data) sitting open.
-export function requireAuth(request, env) {
-  const configured = env.PORTAL_PASSWORD;
-  if (!configured) {
-    return new Response(
-      "This portal is not configured yet: the PORTAL_PASSWORD secret is not set.",
-      { status: 503 }
-    );
-  }
+import { verifySession, readCookie } from "./shared/session.js";
 
-  const header = request.headers.get("Authorization") || "";
-  const expected = "Basic " + btoa(`portal:${configured}`);
-  if (header !== expected) {
-    return new Response("Authentication required.", {
-      status: 401,
-      headers: { "WWW-Authenticate": 'Basic realm="TSG Outreach Portal"' },
-    });
-  }
+// Every request needs a valid signed session cookie, established by the
+// Microsoft sign-in flow (src/routes/login.js -> .../callback.js). The
+// auth routes themselves are always let through - they're what creates
+// the session in the first place.
+const PUBLIC_PATHS = new Set(["/auth/login", "/auth/callback", "/auth/logout"]);
 
-  return null;
+export async function requireAuth(request, env) {
+  const url = new URL(request.url);
+  if (PUBLIC_PATHS.has(url.pathname)) return null;
+
+  const token = readCookie(request, "session");
+  const session = await verifySession(token, env.SESSION_SECRET);
+  if (session) return null;
+
+  // An API call gets a plain 401 (the page's own fetch/XHR calls can't
+  // follow a redirect into an HTML sign-in page usefully); a normal page
+  // load gets sent to sign in and back.
+  if (url.pathname.startsWith("/api/")) {
+    return new Response("Authentication required.", { status: 401 });
+  }
+  return new Response(null, {
+    status: 302,
+    headers: { Location: "/auth/login" },
+  });
 }

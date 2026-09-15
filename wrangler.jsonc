@@ -8,7 +8,7 @@
   // run_worker_first is required here: without it Cloudflare serves a
   // matching static asset (index.html, on almost every request) straight
   // from the asset store and never invokes the Worker at all - which
-  // means the password check in src/index.js would never run.
+  // means the session check in src/auth.js would never run.
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
@@ -27,10 +27,15 @@
   // account's tsgroup.cloud zone (it is - same zone tsg-portal uses).
   "routes": [
     { "pattern": "outreach.tsgroup.cloud", "custom_domain": true }
-  ]
+  ],
 
-  // PORTAL_PASSWORD is added as an encrypted secret via the Cloudflare
-  // dashboard (Workers & Pages -> tsg-outreach-portal -> Settings ->
-  // Variables and Secrets), never committed here. The whole site 401s
-  // until it's set - see README for details.
+  // Not sensitive - safe to keep here in the repo, same as tsg-portal.
+  // MS_PRIVATE_KEY_PKCS8 and SESSION_SECRET are added as encrypted secrets
+  // via the Cloudflare dashboard instead, never committed to the repo.
+  "vars": {
+    "MS_CLIENT_ID": "REPLACE_WITH_APPLICATION_CLIENT_ID",
+    "MS_REDIRECT_URI": "https://outreach.tsgroup.cloud/auth/callback",
+    "MS_CERT_THUMBPRINT": "2BCD9F147AA79DDE506190FE7F7E2103054328BF",
+    "ALLOWED_EMAIL_DOMAINS": "tapflopumps.co.uk,sychem.co.uk"
+  }
 }
