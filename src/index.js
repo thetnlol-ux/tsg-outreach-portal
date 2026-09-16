@@ -4,7 +4,8 @@ import { handleLogin } from "./routes/login.js";
 import { handleCallback } from "./routes/callback.js";
 import { handleLogout } from "./routes/logout.js";
 import { handleDashboard } from "./routes/dashboard.js";
-import { handleAdmin } from "./routes/admin.js";
+import { handleAdmin, isAdmin } from "./routes/admin.js";
+import { searchCompany } from "./shared/zoominfo.js";
 import { handleSalesforceConnect } from "./routes/salesforce-connect.js";
 import { handleSalesforceCallback } from "./routes/salesforce-callback.js";
 import { handleOutlookConnect } from "./routes/outlook-connect.js";
@@ -60,6 +61,24 @@ export default {
       if (request.method === "GET") return handleGetState(request, env);
       if (request.method === "POST") return handleSaveState(request, env);
       return new Response("Method not allowed", { status: 405 });
+    }
+
+    // Temporary smoke test for the ZoomInfo Client Credentials wiring -
+    // admin-only, no write, just proves the credentials/endpoint work
+    // before anything real gets built on top of it. Safe to delete once
+    // that's confirmed.
+    if (url.pathname === "/admin/zoominfo-test") {
+      const session = await verifySession(readCookie(request, "session"), env.SESSION_SECRET);
+      if (!session || !isAdmin(env, session.email)) {
+        return new Response(null, { status: 302, headers: { Location: "/dashboard" } });
+      }
+      const q = url.searchParams.get("company") || "Tapflo";
+      try {
+        const result = await searchCompany(env, { companyName: q }, { pageSize: 5 });
+        return new Response(JSON.stringify(result, null, 2), { headers: { "content-type": "application/json" } });
+      } catch (e) {
+        return new Response(String(e.message || e), { status: 502 });
+      }
     }
 
     if (url.pathname === "/api/me") {

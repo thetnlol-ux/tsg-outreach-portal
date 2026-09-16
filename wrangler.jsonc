@@ -40,6 +40,7 @@
     "MS_CERT_THUMBPRINT": "2BCD9F147AA79DDE506190FE7F7E2103054328BF",
     "ALLOWED_EMAIL_DOMAINS": "tapflopumps.co.uk,sychem.co.uk",
     "ADMIN_EMAILS": "steve.smith@tapflopumps.co.uk",
+    "ZOOMINFO_CLIENT_ID": "0oa17n6sjtuKIlRLo698",
 
     // Sychem isn't wired up yet (licensing) - only Tapflo's vars are set,
     // so resolveSalesforceOrg() cleanly reports "not set up yet" for a
