@@ -4792,7 +4792,7 @@ function showView(v){
     bM.classList.add('active');
     document.getElementById('pageTitle').textContent = 'Suggested Mailshots';
     document.getElementById('pageSub').textContent = "Cold outreach from this year that has gone quiet for more than 40 days, lined up against the blog, case study or download that actually fits the duty on the thread.";
-    renderMailshotSuggestions();
+    renderMailshotMatched();
   } else if(v==='conversions'){
     conversions.style.display='block';
     bC.classList.add('active');
@@ -4808,187 +4808,16 @@ function showView(v){
   }
 }
 
-/* ============================================================================
-   SUGGESTED MAILSHOTS  (added 02/09/2026 at Aidan's request)
+// 18 Sep: this section used to carry a hardcoded demo dataset (three
+// "ready to send" cards with no working actions at all - no Send Email
+// button, nothing to click - plus a "held back, and why" explanatory
+// list) from before Suggested Mailshots had a real live sync. Fully
+// superseded by renderMailshotMatched() below; removed rather than kept
+// as historical colour once it turned out to still be rendering onto the
+// real page as three stuck, dead cards. #msStats/#msSectors (in the
+// static HTML) are no longer populated by anything - renderMailshotMatched
+// builds its own header with real counts inside #mmHost instead.
 
-   Rule this section applies, in his words: cold outreach he has reached out to
-   THIS YEAR, where more than 40 days have passed since either side last spoke,
-   matched to a relevant blog. Starting with breweries.
-
-   Why the source is Sent Items and not this board: nobody on this board is 40
-   days cold. The whole cascade started on 17 Aug, so the oldest active contact
-   is 15 days old. The 40 day rule necessarily reaches back into the earlier 2026
-   batches, most of which never reached this board at all.
-
-   How the candidate set was built, 02/09/2026:
-     - Swept aidan@ Sent Items across the whole of 2026. Three windows were
-       needed because the connector caps offset paging at 1000 and the year
-       holds more than that: 01/01 to 13/02 (672 messages), 12/02 to 09/06
-       (1,025) and 04/06 to 02/09 (739).
-     - Kept subjects in his outreach shape, then flagged brewing, brewpub,
-       craft beer and cider domains.
-     - Read every candidate thread in full, both directions, before listing it.
-       Of six breweries, three are safe to mail and three are not. That check is
-       the point of this section: two had already said no and one is mid-deal.
-
-   Content matched from CONTENT_LIBRARY_STATS below: 227 URLs captured the same
-   day, 50 case studies, 45 blog posts and 132 product downloads. The full list
-   lives in the project spec at claude/content-library.md.
-============================================================================ */
-const CONTENT_LIBRARY_STATS = {caseStudies:50, blogs:45, downloads:132, captured:'02/09/2026'};
-
-const MAILSHOT_SECTORS = [
-  {key:'brewery', label:'Breweries', done:true},
-  {key:'distillery', label:'Distilleries', done:false},
-  {key:'dairy', label:'Dairy', done:false},
-  {key:'bakery', label:'Bakery', done:false},
-  {key:'chemical', label:'Chemical processing', done:false},
-  {key:'water', label:'Water and wastewater', done:false}
-];
-
-const MAILSHOT_QUEUE = [
-  {
-    id:'langham', sector:'brewery', state:'ready',
-    company:"Langham Brewery", loc:'Lodsworth, West Sussex',
-    contactName:'Charlie', contactTitle:'Contact on the brewery office address',
-    email:'office@langhambrewery.co.uk', phone:null,
-    lastTouch:'2026-02-17', lastTouchBy:'Ethan Power, with Aidan copied in',
-    firstTouch:'2026-02-16',
-    replyState:'interested', replyFrom:'Charlie, 16/02/2026',
-    replyQuote:'I have not yet used this pump and some insight into its operation would be beneficial. Do you have a pdf manual you can send too?',
-    duty:'An EP Mini Liverani flexible impeller pump and a Miniverter variable speed unit, supplied in 2021 and, as of February, still not put into service. Pneumatically operated diaphragm pumps also on site.',
-    ownerFlag:'The last message on this thread came from Ethan Power rather than Aidan, so check with him before sending.',
-    why:'He asked for a manual and for someone to walk him through operating the pump, and then it went quiet for six months. This is the one on the list where the customer asked for something and did not get it.',
-    content:{
-      kind:'blog',
-      title:'Flexible Impeller Pumps and Their Benefits',
-      url:'https://www.tapflopumps.co.uk/blog/flexible-impeller-pump-benefits/', img:'https://www.tapflopumps.co.uk/app/uploads/2024/05/EP-Flexible-Impeller.jpg', imgAlt:'An EP flexible impeller pump with metal hose attached', opener:'I hope you\'re well. You asked back in February for a manual and some help running the EP Mini, and I do not think you ever got it, so here is the guide, with the brochure for your exact model underneath it.',
-      published:null,
-      standfirst:'The EP Mini sitting in your brewery is one of eight flexible impeller variants, and the guide covers what the pump will and will not do before you commission it.',
-      bullets:[
-        {h:'It self primes from dry.', t:'Up to 6 metres, which is what makes it suit tank, sump and drum emptying without a flooded suction.'},
-        {h:'Impeller material decides the duty.', t:'Five FDA approved compounds, NBR, CR, EPDM, NR and VMQ. EPDM is the one for hot fluids and CIP, and EPDM is what is fitted to your unit.'},
-        {h:'Viscosity and solids.', t:'Up to 50,000 cPs with solids passage to 25 mm, so trub and hop matter are within range rather than a problem.'}
-      ],
-      bridge:[
-        'The reason I am sending this rather than a sales note is that you asked back in February for a manual and some insight into running the unit, and I do not think you ever got it. That is on us.',
-        'The brochure for your exact model is attached below, and the guide above covers the operating side. If it is easier, I am still happy to jump on a Teams call and walk through commissioning it with you.'
-      ],
-      cta:'Book me in for that walkthrough',
-      extra:{label:'EP Series brochure, your exact model', url:'https://www.tapflopumps.co.uk/app/uploads/2024/05/EP-Series-Close-Coupled-Self-Priming-Flexible-Impeller-Pump.pdf'}
-    }
-  },
-  {
-    id:'woldtop', sector:'brewery', state:'ready',
-    company:"Wold Top Brewery", loc:'Driffield, East Yorkshire',
-    contactName:'Andrew', contactTitle:'Contact on the production address',
-    email:'production@woldtopbrewery.co.uk', phone:null,
-    lastTouch:'2026-02-19', lastTouchBy:'Aidan',
-    firstTouch:'2026-02-19',
-    replyState:'none', replyFrom:null, replyQuote:null,
-    duty:'Someone at the brewery was on the Mobile CIP Systems pages. One cold email went out on the back of that and was never answered.',
-    ownerFlag:null,
-    why:'A single unanswered email off a real website visit to the CIP pages. The CIP guide names breweries as its first industry, so the content lines up with what they were actually reading.',
-    content:{
-      kind:'blog',
-      title:'A Comprehensive Guide to Clean in Place (CIP) Systems',
-      url:'https://www.tapflopumps.co.uk/blog/guide-to-clean-in-place-systems/', img:'https://www.tapflopumps.co.uk/app/uploads/2024/12/multi_tank_clean_in_place_system.jpg', imgAlt:'Multi-tank Clean in Place system', opener:'I hope you\'re well. Somebody at Wold Top was looking at mobile CIP on our site back in February, so rather than chase that I thought the guide would be more use to you.',
-      published:null,
-      standfirst:'Written for breweries first, and specific about the numbers a CIP set has to hit rather than the usual talk about hygiene.',
-      bullets:[
-        {h:'1.5 m/s is the number that matters.', t:'Below that minimum velocity you do not get the turbulent flow that lifts residue off the wall, whatever the chemistry is doing. A 3 inch tube at up to 3 m/s gives you 24 m3/hour.'},
-        {h:'Temperature buys you more than dose.', t:'A 10 degree increase can lift cleaning efficiency by half. Alkaline runs at 70 to 80 degrees, acid at 50 to 70.'},
-        {h:'The standard recipe, in full.', t:'2% caustic on the alkaline stage, 1% phosphoric on the acid stage, 2 to 20 minutes contact per phase.'}
-      ],
-      bridge:[
-        'I got in touch back in February after somebody at Wold Top was looking at mobile CIP on our site, and I never heard back, which is fair enough. Rather than chase it again I thought the guide was more use to you.',
-        'If you are weighing up mobile against modular, the honest answer depends on how many vessels you are cleaning and whether you want the set following the work around the brewery. Happy to talk that through with no obligation, or just take the guide and use it.'
-      ],
-      cta:'Talk through mobile against modular',
-      extra:{label:'CIP Systems brochure, mobile, modular and multi-tank', url:'https://www.tapflopumps.co.uk/app/uploads/2026/06/Clean-in-Place-Systems-1.pdf'}
-    }
-  },
-  {
-    id:'sulwath', sector:'brewery', state:'ready',
-    company:"Sulwath Brewers", loc:'Castle Douglas, Dumfries and Galloway',
-    contactName:'Scott Henderson', contactTitle:'Sales Manager',
-    email:'scott@sulwathbrewers.co.uk', phone:'01556 504525',
-    lastTouch:'2026-04-15', lastTouchBy:'Aidan',
-    firstTouch:'2026-04-14',
-    replyState:'interested', replyFrom:'Scott Henderson, 19/11/2025',
-    replyQuote:'Apologies for the delay in response, things have been a bit hectic. Friday morning would work best for me.',
-    duty:'Brewery transfer pumps and mag drive pumps, off an April website visit. The bigger context is the rebuild after the fire at the brewery, so pumps, valves and tanks for a new set up.',
-    ownerFlag:'Send to scott@ only. The address scott.henderson@sulwathbrewers.co.uk hard bounced in October 2025 with "User unknown in virtual alias table", so it is dead.',
-    why:'He took a Teams call in November, then the April follow up went unanswered. A brewery rebuilding after a fire is specifying kit whether or not it replies to email, so the timing is worth another go.',
-    content:{
-      kind:'blog',
-      title:'The Complete Guide to a Centrifugal Pump',
-      url:'https://www.tapflopumps.co.uk/blog/guide-to-a-centrifugal-pump/', img:'https://www.tapflopumps.co.uk/wp-content/uploads/2020/05/CTI_Industrial_Centrifugal_Pump.png', imgAlt:'Tapflo CTI industrial centrifugal pump', opener:'I hope you\'re well. You were looking at brewery transfer and mag drive pumps back in April, and with the rebuild on you may find the guide more use than a chase, particularly the part on suction head margin.',
-      published:null,
-      standfirst:'Covers the whole centrifugal range including the CTM magnetically driven units you were looking at, and the sizing rules that decide whether a pump lasts.',
-      bullets:[
-        {h:'Where mag drive earns its place.', t:'The CTM has no shaft seal at all, so there is nothing to leak and nothing to replace on a seal schedule. That is the argument on transfer duties you would rather not revisit.'},
-        {h:'The suction rule people skip.', t:'Keep at least a 25% margin on net positive suction head at the suction port across every flow you expect, or you cavitate. Most premature failures start here.'},
-        {h:'Range and materials.', t:'Up to 450 m3/hr, and to 7,800 m3/hr on the BBA units, at 16 bar maximum. Hygienic models are 316L with electro-polished casings.'}
-      ],
-      bridge:[
-        'You were looking at brewery transfer and mag drive pumps back in April and I did not manage to catch you after that, so no chase here, just the guide.',
-        'Given you are rebuilding, the part worth reading is the suction head margin. Getting that wrong on a new install is the most common reason a pump that is correctly specified on paper still fails early. If you want a second pair of eyes on the pump schedule for the rebuild, send it over and I will mark it up.'
-      ],
-      cta:'Review my pump schedule',
-      extra:{label:'CTM Magdrive brochure', url:'https://www.tapflopumps.co.uk/app/uploads/2024/06/CTM_Magdrive_Pumps_brochure.pdf'}
-    }
-  },
-  /* ---- filtered out, kept visible so the filter can be checked ---- */
-  {
-    id:'salopian', sector:'brewery', state:'excluded',
-    company:'Salopian Brewery', loc:'Hadnall, Shropshire',
-    contactName:'Trevor Hourican', contactTitle:null,
-    email:'trevor@salopianbrewery.co.uk', phone:null,
-    lastTouch:'2026-04-17', lastTouchBy:'Aidan',
-    replyState:'declined', replyFrom:'Trevor Hourican, 16/04/2026',
-    replyQuote:'We will in touch if appropriate. Thanks.',
-    duty:'High pressure peristaltic hose pumps, off a visit to the ALH page.',
-    excludeReason:'Told us plainly they will come to us. Sending marketing 4 months later is the fastest way to make that a firm no.'
-  },
-  {
-    id:'alfreds', sector:'brewery', state:'excluded',
-    company:"Alfred's Brewery", loc:'Winchester, Hampshire',
-    contactName:'Steve', contactTitle:null,
-    email:'steve@alfredsbrewery.co.uk', phone:'07980 483124',
-    lastTouch:'2026-06-26', lastTouchBy:'Aidan',
-    replyState:'declined', replyFrom:'Steve, 25/06/2026',
-    replyQuote:"We don't have any requirements at the moment but will certainly get in touch if something comes up.",
-    duty:'Generic pump and spares check in. The real duty is older: a replacement pump for an ICS Evo 10 process water chiller, quoted against a Calpeda unit in 2023.',
-    excludeReason:'Declined nine weeks ago and asked to make the running themselves. Worth a look again in the new year, not now.'
-  },
-  {
-    id:'burntmill', sector:'brewery', state:'excluded',
-    company:'Burnt Mill Brewery', loc:'Suffolk',
-    contactName:'Sophie de Ronde', contactTitle:null,
-    email:'sophie@burntmillbrewery.com', phone:null,
-    lastTouch:'2026-07-14', lastTouchBy:'Sophie de Ronde',
-    replyState:'interested', replyFrom:'Sophie de Ronde, 14/07/2026',
-    replyQuote:'Let’s go for the locked in price for 36 months. For ordering, are PO adequate or do you have an online portal that I would need to order through?',
-    duty:'No pump duty at all. This is Hygiena ATP swabs through Sychem, on a 36 month price protection agreement.',
-    excludeReason:'Live deal in flight with a signed credit account form. A Tapflo pump mailshot across the top of Joe closing an ATP agreement would cut across it.'
-  },
-  {
-    id:'thenewt', sector:'brewery', state:'unverified',
-    company:'The Newt in Somerset', loc:'Bruton, Somerset',
-    contactName:null, contactTitle:null,
-    email:null, phone:null,
-    lastTouch:'2026-01-16', lastTouchBy:'Aidan',
-    replyState:'unread', replyFrom:null, replyQuote:null,
-    duty:'Pump and hygiene support. The thread refers to the creamery and to ATP hygiene, so it reads as a cider estate rather than a brewing led site.',
-    excludeReason:'A cider maker rather than a brewery, and there is a reply on the thread that has not been read yet. Not listed as ready until somebody has read it.'
-  }
-];
-
-
-/* Builds the blog mailshot from the design agreed on 02/09/2026: the Biocatalysts
-   wrapper unchanged, with the case study panel swapped for a blog panel. The
-   contact page is the CTA destination, per Aidan on 02/09. */
 /* The blog feed gives dd/mm/yyyy and the case study feed gives yyyy-mm-dd, so
    both are normalised here rather than in the data. */
 function ukDate(d){
@@ -4996,83 +4825,6 @@ function ukDate(d){
   let m = t.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if(m) return m[3] + '/' + m[2] + '/' + m[1];
   return t;
-}
-
-function buildBlogMailshot(s){
-  const c = s.content;
-  const first = (s.contactName || '').split(' ')[0] || 'there';
-  const bullets = c.bullets.map(b =>
-    `<tr><td style="font-size:14px; color:#555555; padding-bottom:8px; line-height:1.55;"><strong style="color:#111111;">${b.h}</strong> ${b.t}</td></tr>`
-  ).join('\n');
-  /* 03/09: nothing goes below the panel any more, on any of these. Everything
-     the email needs to say is the one line under the greeting. */
-  const kindWord  = c.kindWord || (c.kind === 'case-study' ? 'case study' : 'blog');
-  /* A product page such as the drum unloading range is neither a blog nor a case
-     study, so it supplies its own labels. */
-  const kindLabel = c.kindLabel || (c.kind === 'case-study' ? 'FROM THE TAPFLO CASE STUDIES'
-                                                           : 'FROM THE TAPFLO BLOG');
-  const readMore  = c.readMore  || (c.kind === 'case-study' ? 'Read the full case study'
-                                                           : 'Read the full guide');
-  const insideLabel = c.insideLabel || (c.kind === 'case-study' ? 'WHAT WE DID'
-                                                               : 'INSIDE THE GUIDE');
-  /* The three hand-checked threads have a reason for writing that is specific to
-     them, so they supply their own line. Everything else gets the generic one. */
-  const opener = c.opener
-    || (`I hope you're well. I thought I would send over this ${kindWord}, `
-        + `as it may be of interest in relation to process operations at ${s.subjectCompany || s.company}.`);
-  /* Word renders Outlook on Windows and cannot decode WebP, so every image here
-     is a confirmed jpg or png. Width is set on the tag as well as in CSS because
-     Word ignores max-width. */
-  const hero = c.img ? `<tr><td style="padding:0;">
-<img src="${c.img}" alt="${(c.imgAlt||'').replace(/"/g,'&quot;')}" width="598" style="display:block; width:100%; max-width:598px; height:auto; border:0; outline:none; text-decoration:none;">
-</td></tr>` : '';
-  const extra = c.extra ? `<p style="margin:10px 0 0 0;"><a href="${c.extra.url}" style="font-size:13px; color:#004b87; text-decoration:underline;">${c.extra.label} &rsaquo;</a></p>` : '';
-  const meta = c.published ? `<div style="font-size:11px; color:#6b7a85; margin-top:6px;">Published ${ukDate(c.published)}</div>` : '';
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f2f2f0; padding:24px 0;">
-<tr><td align="center">
-<table role="presentation" class="email-wrapper" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:6px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.08); max-width:600px; width:100%; font-family:Arial,Helvetica,sans-serif;">
-<tr><td class="email-header" style="background-color:#004b87; padding:24px 32px;">
-<span style="color:#ffffff; font-size:22px; font-weight:bold; letter-spacing:0.5px;">TAPFLO UK</span>
-<div style="color:#c9d6f2; font-size:12px; margin-top:4px;">Pumps &amp; Bespoke Process Systems</div>
-</td></tr>
-<tr><td class="email-padding" style="padding:32px 32px 4px 32px;">
-<p style="font-size:15px; color:#222222; line-height:1.6; margin:0 0 14px 0;">Hi ${first},</p>
-<p style="font-size:15px; color:#222222; line-height:1.6; margin:0 0 18px 0;">${opener}</p>
-</td></tr>
-<tr><td class="email-padding" style="padding:0 32px 8px 32px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e2e2; border-radius:6px;">
-${hero}
-<tr><td style="background-color:#eef2fb; padding:16px 24px; border-bottom:1px solid #e2e2e2;">
-<span style="font-size:11px; color:#004b87; font-weight:bold; letter-spacing:1px;">${kindLabel}</span>
-<div style="font-size:18px; color:#111111; font-weight:bold; margin-top:4px; line-height:1.35;">${c.title}</div>
-${meta}
-</td></tr>
-<tr><td style="padding:20px 24px 4px 24px;">
-<p style="font-size:14px; color:#555555; line-height:1.6; margin:0 0 14px 0;">${c.standfirst}</p>
-</td></tr>
-<tr><td style="padding:0 24px 20px 24px;">
-<div style="font-size:11px; color:#004b87; font-weight:bold; letter-spacing:1px; padding-bottom:8px;">${insideLabel}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-${bullets}
-</table>
-<p style="margin:14px 0 0 0;"><a href="${c.url}" style="font-size:14px; color:#004b87; font-weight:bold; text-decoration:underline;">${readMore} &rsaquo;</a></p>
-${extra}
-</td></tr>
-</table>
-</td></tr>
-
-<tr><td align="center" class="email-padding" style="padding:26px 32px 32px 32px;">
-<a href="https://www.tapflopumps.co.uk/contact-us/" target="_blank" rel="noopener" style="background-color:#004b87; color:#ffffff; text-decoration:none; padding:14px 32px; border-radius:4px; font-size:15px; font-weight:bold; display:inline-block;">${c.cta}</a>
-</td></tr>
-<tr><td class="email-padding" style="padding:0 32px 32px 32px; border-top:1px solid #eeeeee;">
-<p style="font-size:14px; color:#222222; line-height:1.6; margin:16px 0 0 0;">Kind Regards,<br>
-<strong>Aidan Martin</strong><br>Customer Support Manager<br>Tapflo UK<br>Tel: 02380 252 325</p>
-</td></tr>
-<tr><td class="email-padding" style="background-color:#f7f7f7; padding:16px 32px; text-align:center;">
-<span style="font-size:11px; color:#999999;">Tapflo UK &middot; Southampton, United Kingdom</span>
-</td></tr>
-</table>
-</td></tr></table>`;
 }
 
 /* 08/09: `company` is the name the BOARD uses, because that is what links a
@@ -5083,108 +4835,6 @@ ${extra}
    breaking that link, and the lead carries the alias so the sweep still
    matches the reply. */
 function mailshotSubject(s){ return (s.subjectCompany || s.company) + ' | ' + s.content.title; }
-function daysSince(d){
-  const then = new Date(d + 'T00:00:00');
-  const now = new Date();
-  return Math.round((new Date(now.getFullYear(),now.getMonth(),now.getDate()) - then) / 86400000);
-}
-const REPLY_LABEL = {
-  interested:['Replied, was interested','ms-good'],
-  none:['No reply on file','ms-neutral'],
-  declined:['Said no','ms-bad'],
-  unread:['Reply not read yet','ms-warn']
-};
-
-function renderMailshotSuggestions(){
-  const wrap = document.getElementById('mailshotBody');
-  if(!wrap) return;
-  const ready = MAILSHOT_QUEUE.filter(x=>x.state==='ready');
-  const held  = MAILSHOT_QUEUE.filter(x=>x.state!=='ready');
-  const stat = document.getElementById('msStats');
-  if(stat){
-    stat.innerHTML =
-      `<div class="ms-stat"><b>${ready.length}</b><span>ready to send</span></div>` +
-      `<div class="ms-stat"><b>${held.length}</b><span>held back</span></div>` +
-      `<div class="ms-stat"><b>${CONTENT_LIBRARY_STATS.blogs}</b><span>blogs in the library</span></div>` +
-      `<div class="ms-stat"><b>${CONTENT_LIBRARY_STATS.caseStudies + CONTENT_LIBRARY_STATS.blogs + CONTENT_LIBRARY_STATS.downloads}</b><span>URLs held in total</span></div>`;
-  }
-  const chips = document.getElementById('msSectors');
-  if(chips){
-    chips.innerHTML = MAILSHOT_SECTORS.map(s=>
-      `<span class="ms-chip ${s.done?'on':''}">${s.label}${s.done?'':' <em>not done yet</em>'}</span>`).join('');
-  }
-
-  let html = '';
-  ready.forEach((s,i)=>{
-    const cold = daysSince(s.lastTouch);
-    const [rl, rc] = REPLY_LABEL[s.replyState] || ['',''];
-    const mailto = 'mailto:' + s.email + '?subject=' + encodeURIComponent(mailshotSubject(s));
-    html += `
-    <article class="ms-card">
-      <div class="ms-head">
-        <div class="ms-num">${i+1}</div>
-        <div class="ms-who">
-          <strong>${s.contactName}${s.contactTitle?', <span>'+s.contactTitle+'</span>':''}</strong>
-          <div class="ms-co">${s.company} &middot; ${s.loc}</div>
-          <div class="ms-addr mono">${s.email}${s.phone?' &middot; '+s.phone:''}</div>
-        </div>
-        <div class="ms-tags">
-          <span class="ms-pill ms-cold">${cold} days cold</span>
-          <span class="ms-pill ${rc}">${rl}</span>
-        </div>
-      </div>
-      <div class="ms-grid">
-        <div class="ms-why">
-          <h4>Last spoke</h4>
-          <p class="ms-p"><span class="mono">${s.lastTouch}</span>, sent by ${s.lastTouchBy}. First touch <span class="mono">${s.firstTouch}</span>.</p>
-          ${s.replyQuote?`<h4>What they said</h4><p class="ms-p"><span class="ms-quote">${s.replyQuote}</span><span class="ms-attrib">${s.replyFrom}</span></p>`:''}
-          <h4>The duty on the thread</h4>
-          <p class="ms-p">${s.duty}</p>
-          <h4>Why this content</h4>
-          <p class="ms-p">${s.why}</p>
-          ${s.ownerFlag?`<div class="ms-flag"><b>Before you send</b> ${s.ownerFlag}</div>`:''}
-          <h4>Matched to</h4>
-          <p class="ms-p"><a href="${s.content.url}" target="_blank" rel="noopener">${s.content.title}</a>${s.content.extra?`<br><a href="${s.content.extra.url}" target="_blank" rel="noopener">${s.content.extra.label}</a>`:''}</p>
-        </div>
-        <div class="ms-mail">
-          <div class="ms-bar">
-            <div class="ms-subj"><b>Subject:</b> ${mailshotSubject(s)}</div>
-            <button class="ms-copy" data-mscopy="msmail-${s.id}" data-msmailto="${mailto}">Copy for Outlook</button>
-          </div>
-          <div class="ms-bar ms-subbar">
-            <a class="ms-lite" href="${mailto}">Open empty draft</a>
-            <button class="ms-lite" data-mssrc="msmail-${s.id}">Copy source</button>
-            <span class="ms-hint">Copies the email <b>formatted</b>, then opens a draft to ${s.email} with the subject filled in. Put the cursor in the body and press Ctrl+V.</span>
-          </div>
-          <div class="ms-scroll"><div id="msmail-${s.id}">${buildBlogMailshot(s)}</div></div>
-        </div>
-      </div>
-    </article>`;
-  });
-
-  html += `<h3 class="ms-h3">Held back, and why <span>${held.length} of ${MAILSHOT_QUEUE.length} brewery threads</span></h3>
-  <p class="ms-note">Kept on screen rather than filtered away silently, so the rule can be checked. Every one of these was read in full before being held.</p>
-  <div class="ms-held">`;
-  held.forEach(s=>{
-    const cold = daysSince(s.lastTouch);
-    const [rl, rc] = REPLY_LABEL[s.replyState] || ['',''];
-    html += `
-    <div class="ms-heldcard ${s.state}">
-      <div class="ms-heldtop">
-        <strong>${s.company}</strong>
-        <span class="ms-pill ${rc}">${rl}</span>
-        <span class="ms-pill ms-cold">${cold} days</span>
-      </div>
-      <div class="ms-heldwho">${s.contactName?s.contactName:'No named contact'}${s.email?' &middot; <span class="mono">'+s.email+'</span>':''}</div>
-      ${s.replyQuote?`<p class="ms-p"><span class="ms-quote">${s.replyQuote}</span><span class="ms-attrib">${s.replyFrom}</span></p>`:''}
-      <p class="ms-p ms-duty">${s.duty}</p>
-      <div class="ms-reason"><b>${s.state==='unverified'?'Not checked yet':'Not sending'}</b> ${s.excludeReason}</div>
-    </div>`;
-  });
-  html += `</div>`;
-  wrap.innerHTML = html;
-  renderMailshotMatched();
-}
 
 /* Copy controls for this section, same behaviour as the review page: a
    selection copy puts a real text/html flavour on the clipboard, which is what
@@ -5509,8 +5159,6 @@ function msTopicPhrase(t){
   }).join(' ');
 }
 
-/* Shapes a matched row into the object buildBlogMailshot already expects, so the
-   agreed design is used unchanged. */
 /* Which of the company's live addresses is selected on each row. Aidan sends
    these one person at a time, so the email is rebuilt per recipient rather than
    addressed to a group. */
