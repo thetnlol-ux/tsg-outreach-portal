@@ -534,6 +534,8 @@
   .mm-chip.on{background:var(--tapflo); color:#fff; border-color:var(--tapflo);}
   .mm-chip span{font:600 11px/1 'Roboto Mono',monospace; opacity:.65;}
   .mm-chip.on span{opacity:.8;}
+  .mm-chip-more{background:transparent; border-style:dashed; color:var(--muted-soft); font-weight:600;}
+  .mm-chip-more:hover{color:var(--ink); border-color:#8fa3a0;}
   .mm-band{border-style:dashed;}
   .mm-toggle{font:600 12px/1 Inter,system-ui,sans-serif; color:var(--ink);
     background:var(--panel); border:1px solid var(--line-strong); border-radius:999px;
@@ -5178,7 +5180,7 @@ function msRowImg(r){
    the matched page itself says. Nothing is assumed about the plant, which is why
    each row asks to be looked at before it is sent.
 --------------------------------------------------------------------------- */
-const MS_FILTER = {tech:'all', band:'all', caveats:true, portalOnly:false, todo:false, q:''};
+const MS_FILTER = {tech:'all', band:'all', caveats:true, portalOnly:false, todo:false, q:'', techExpanded:false};
 
 const MS_BANDS = [
   {key:'all',     label:'Any gap'},
@@ -5790,8 +5792,25 @@ function renderMailshotMatched(){
   if(!host) return;
   const vis = msVisible();
   const cav = MAILSHOT_MATCHED.filter(r=>r.warn).length;
-  const chips = MAILSHOT_TECHS.map(t=>
-    `<button class="mm-chip${MS_FILTER.tech===t.key?' on':''}" data-mmtech="${t.key}">${t.label}<span>${t.n}</span></button>`).join('');
+  // 18 Sep: 20 sector chips in one wrapping row, several sitting at 0-3
+  // matches, was the real source of the "still looks messy" complaint - no
+  // amount of labelling a row fixes 20 buttons crammed into it. Sorted by
+  // count, zero-count sectors dropped entirely (a filter for zero results
+  // helps no one), and only the top TECH_SHOWN shown by default with a
+  // "+N more" toggle for the long tail - the currently selected chip always
+  // stays visible even if it's in that tail, so picking it never hides it.
+  const TECH_SHOWN = 8;
+  const sortedTechs = MAILSHOT_TECHS.filter(t=>t.n>0).sort((a,b)=>b.n-a.n);
+  const topTechs = sortedTechs.slice(0, TECH_SHOWN);
+  const activeOutsideTop = MS_FILTER.tech!=='all' && !topTechs.some(t=>t.key===MS_FILTER.tech);
+  const techShown = MS_FILTER.techExpanded ? sortedTechs
+    : activeOutsideTop ? [...topTechs, sortedTechs.find(t=>t.key===MS_FILTER.tech)]
+    : topTechs;
+  const techHiddenCount = sortedTechs.length - techShown.length;
+  const chips = techShown.map(t=>
+    `<button class="mm-chip${MS_FILTER.tech===t.key?' on':''}" data-mmtech="${t.key}">${t.label}<span>${t.n}</span></button>`).join('')
+    + (techHiddenCount>0 ? `<button class="mm-chip mm-chip-more" data-mmtechmore="1">+${techHiddenCount} more</button>`
+       : MS_FILTER.techExpanded && sortedTechs.length>TECH_SHOWN ? `<button class="mm-chip mm-chip-more" data-mmtechmore="1">Show fewer</button>` : '');
   const bands = MS_BANDS.map(b=>
     `<button class="mm-chip mm-band${MS_FILTER.band===b.key?' on':''}" data-mmband="${b.key}">${b.label}</button>`).join('');
   host.innerHTML = `
@@ -5907,7 +5926,7 @@ document.addEventListener('keydown', function(ev){
 
 document.addEventListener('click', function(ev){
   const t = ev.target && ev.target.closest
-    ? ev.target.closest('[data-mmtech],[data-mmband],[data-mmtoggle],[data-mmrcpt],[data-mmsent],[data-mmnever],[data-mmunnever],[data-mmpic],[data-mmshuffle],[data-mmpicreset],[data-mmpage],[data-mmpagereset],[data-mmpskind],[data-mmgallery],[data-mmgpick],[data-mmgclose]') : null;
+    ? ev.target.closest('[data-mmtech],[data-mmtechmore],[data-mmband],[data-mmtoggle],[data-mmrcpt],[data-mmsent],[data-mmnever],[data-mmunnever],[data-mmpic],[data-mmshuffle],[data-mmpicreset],[data-mmpage],[data-mmpagereset],[data-mmpskind],[data-mmgallery],[data-mmgpick],[data-mmgclose]') : null;
   if(!t) return;
   /* Picking a picture re-renders the row body, and the body is the same node
      "Copy for Outlook" reads, so the choice is in Outlook on the very next
@@ -6020,6 +6039,7 @@ document.addEventListener('click', function(ev){
     return;
   }
   if(t.hasAttribute('data-mmtech')){ MS_FILTER.tech = t.getAttribute('data-mmtech'); renderMailshotMatched(); return; }
+  if(t.hasAttribute('data-mmtechmore')){ MS_FILTER.techExpanded = !MS_FILTER.techExpanded; renderMailshotMatched(); return; }
   if(t.hasAttribute('data-mmband')){ MS_FILTER.band = t.getAttribute('data-mmband'); renderMailshotMatched(); return; }
   const id = t.getAttribute('data-mmtoggle');
   const body = document.querySelector(`[data-mmbody="${id}"]`);
