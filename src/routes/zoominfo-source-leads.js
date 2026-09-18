@@ -107,6 +107,18 @@ function employeeBandLabel(employeeCount) {
   return `${n} (250 - 499 band)`;
 }
 
+// Matches the frontend's own definition exactly (isLeadRemoved +
+// isColdContact in app.html) - "the desk" means visible cold leads, not
+// every lead this board has ever held. tapfloLeads only ever grows (a
+// converted/excluded lead stays in the array, just flagged), so counting
+// the raw array length here meant "need" would hit 0 permanently the
+// moment the board passed 50 total leads ever sourced - a real bug, not
+// just a testing inconvenience.
+function isVisibleColdLead(l) {
+  if (!l || l.removed) return false;
+  return (l.contacts || []).some((c) => !c.followUp || c.followUp.status === "not_started");
+}
+
 function escapeSoqlString(s) {
   return s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }
@@ -156,11 +168,24 @@ export async function handleZoomInfoSourceLeads(request, env) {
   const row = await env.DB.prepare("SELECT data FROM portal_state WHERE id = 1").first();
   const state = row ? JSON.parse(row.data) : {};
   const tapfloLeads = Array.isArray(state.tapfloLeads) ? state.tapfloLeads : [];
+  // Dedupe against every lead this board has ever held (including
+  // converted/excluded ones) - re-sourcing a company just because it's no
+  // longer "visible" would be wrong. Only the TARGET count below cares
+  // about visible cold leads specifically.
   const existingNames = new Set(tapfloLeads.map((l) => (l.company || "").trim().toLowerCase()));
 
-  const need = Math.max(0, 50 - tapfloLeads.length);
-  if (need === 0) {
-    return json({ sourced: true, candidates: [], note: "Board is already at 50 or more Tapflo leads." });
+  const visibleColdCount = tapfloLeads.filter(isVisibleColdLead).length;
+  const need = Math.max(0, 50 - visibleColdCount);
+  // Same per-user testing override as the frontend button's visibility -
+  // scoped to this one account so Steve can verify the feature works
+  // without the real board needing to genuinely drop below 50 first.
+  // Deliberately a small batch (3, not the full 15 cap): this is for
+  // verifying the pipeline still works, not a real production top-up, and
+  // every candidate that clears the gates still spends a real ZoomInfo
+  // enrich credit.
+  const isTestOverride = session.email.toLowerCase() === "steve.smith@tapflopumps.co.uk";
+  if (need === 0 && !isTestOverride) {
+    return json({ sourced: true, candidates: [], note: `The desk already has ${visibleColdCount} visible cold leads - no top-up needed.` });
   }
   // Capped per click regardless of how big "need" is - every candidate that
   // clears every gate below still costs a real ZoomInfo enrich credit per
@@ -168,7 +193,7 @@ export async function handleZoomInfoSourceLeads(request, env) {
   // added, roughly a 10% hit rate sourcing the sector mix) mean hitting
   // "need" in full will take several clicks, not one - that's normal, not
   // a bug.
-  const targetCount = Math.min(need, 15);
+  const targetCount = isTestOverride && need === 0 ? 3 : Math.min(need, 15);
 
   const org = resolveSalesforceOrg(env, session.email);
   const sfConnection = org
