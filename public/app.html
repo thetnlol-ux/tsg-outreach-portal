@@ -5040,7 +5040,16 @@ function buildBrandedMailshot(s){
   const bullets = c.bullets.map(b =>
     `<tr><td style="font-family:${A}; font-size:14px; color:#555555; padding-bottom:8px; line-height:1.55;">`
     + (b.h ? `<strong style="color:#111111;">${b.h}</strong> ` : '') + b.t + `</td></tr>`).join('\n');
-  const hero = c.img ? `<tr><td height="${msImgHeight(598)}" style="padding:0; line-height:0; background-color:#eef2fb;">${msImg(c.img, c.imgAlt, 598)}</td></tr>` : '';
+  // 18 Sep, third real test: even the coloured table cell disappears under
+  // New Outlook's own opaque "image blocked" placeholder, which overlays
+  // that space regardless of any styling on the image or its container -
+  // by design, not a bug, the same as every sender's marketing email gets
+  // in that client. Nothing inside the image's own box can be relied on to
+  // show, so a plain-text caption sits in a SEPARATE cell right below it -
+  // ordinary text is never touched by that placeholder, whatever client
+  // this lands in.
+  const hero = c.img ? `<tr><td height="${msImgHeight(598)}" style="padding:0; line-height:0; background-color:#eef2fb;">${msImg(c.img, c.imgAlt, 598)}</td></tr>
+<tr><td style="padding:6px 24px; background-color:#eef2fb; font-family:${A}; font-size:11px; color:#5a6b78; text-align:center;">&#128247; Photo - if you don't see it above, click "Download pictures" or "Show images" in this email.</td></tr>` : '';
   const meta = c.published
     ? `<div style="font-family:${A}; font-size:11px; color:#6b7a85; margin-top:6px;">Published ${ukDate(c.published)}</div>` : '';
   const extraA = c.extra
