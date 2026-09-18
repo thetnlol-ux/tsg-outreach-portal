@@ -83,3 +83,53 @@ export async function enrichCompany(env, matchCompanyInput, outputFields) {
     },
   });
 }
+
+// Broad company discovery (not a single named company) - used to source
+// fresh cold leads by criteria like country/industry/size rather than
+// looking up one known company. Free (Search endpoint), same as
+// searchCompany above, but takes arbitrary attributes instead of a fixed
+// companyName shape. Confirmed by real trial and error against this API
+// version - its field names/shapes don't match ZoomInfo's own docs:
+//   - industryKeywords: a single free-text string (not an array), fuzzy-
+//     matched against ZoomInfo's own industry taxonomy - "Food & Beverages"
+//     gets 0 results, "Food Production" gets real matches. No documented
+//     list of what works; verified case by case.
+//   - employeeCount: a comma-delimited string of fixed buckets, exactly
+//     "1to4,5to9,10to19,20to49,50to99,100to249,250to499,500to999,
+//     1000to4999,5000to9999,10000plus" - anything else (a number, a
+//     {min,max} object, "employeeCountMin"/"employeeCountRange") is
+//     rejected outright.
+export async function searchCompaniesByCriteria(env, criteria) {
+  return callApi(env, "/companies/search", {
+    data: { type: "CompanySearch", attributes: criteria },
+  });
+}
+
+// Free contact discovery - real people at a company matching a role, but
+// metadata only (name, jobTitle, accuracy score, and hasEmail/hasDirectPhone/
+// hasMobilePhone flags) - never the actual email or phone number. Getting
+// the real contact details needs enrichContacts below, which is a paid,
+// per-contact credit call.
+export async function searchContacts(env, criteria) {
+  return callApi(env, "/contacts/search", {
+    data: { type: "ContactSearch", attributes: criteria },
+  });
+}
+
+// Paid per-contact enrichment - the only way to get a real email/phone for
+// someone found via searchContacts. matchPersonInput is [{personId}] using
+// the numeric id from that search's own `id` field (confirmed the field is
+// literally "personId", not "id" or "contactId" - both rejected outright).
+// This account's plan disallows some output fields entirely (directPhone,
+// department confirmed rejected with a "contact your Account Manager"
+// error) - keep outputFields to ones already confirmed working:
+// id, firstName, lastName, email, jobTitle, phone, mobilePhone,
+// managementLevel, companyName.
+export async function enrichContacts(env, matchPersonInput, outputFields) {
+  return callApi(env, "/contacts/enrich", {
+    data: {
+      type: "ContactEnrich",
+      attributes: { matchPersonInput, outputFields },
+    },
+  });
+}

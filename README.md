@@ -60,6 +60,23 @@ Separate from, and does not touch, the `tsg-portal` repo/Worker/database.
   is per-contact (searches the signed-in rep's own connected mailbox for
   prior correspondence with that specific person). All three return
   candidate matches for a human to judge — never a silent yes/no.
+- `src/routes/zoominfo-source-leads.js` (`/api/zoominfo/source-leads`) —
+  Tapflo's "top the desk back up to 50 whenever it drops below 10" rule
+  (a footnote on the Tapflo column, from an earlier manual refresh round).
+  A "Source more leads" button appears on the Tapflo column once it's
+  below 10; clicking it searches ZoomInfo by industry/size, cross-checks
+  Salesforce, enriches real contact details for whoever matches a target
+  role, and lists candidates for review — nothing is added to the board
+  without a click. Two things worth knowing: (1) unlike the free checks
+  above, this **spends real ZoomInfo credits** — contact enrichment
+  (`/contacts/enrich`) is a paid, per-contact call, capped at 15 new
+  candidates per click regardless of how many are actually missing; (2)
+  the score it gives each candidate is a deliberately honest, lower
+  placeholder than a hand-researched lead's — product-application fit and
+  any news/funding signal are scored 0 because nobody has actually checked
+  them, not because they're absent. Tapflo only for now — Sychem's
+  Salesforce dedupe has a known licensing gap and its own targeting
+  criteria (quality/technical/decontamination roles) haven't been set up.
 - `migrations/0001_init.sql`, `0002_connections.sql` — the D1 tables this
   needs (`portal_state`, plus `users`/`salesforce_connections`/
   `outlook_connections`/`activity_log` for the API connections). Already
