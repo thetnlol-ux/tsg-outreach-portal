@@ -4165,7 +4165,10 @@ function renderFollowUpList(){
         note.textContent = `⚠ ${reason}`;
         return;
       }
-      note.textContent = `✓ Synced just now — scanned ${body.businessesScanned} recent site visitor(s), matched ${body.matchCount} against the board. Reload the page to see updated visit info.`;
+      const remainingNote = body.remainingToCheck > 0
+        ? ` ${body.remainingToCheck} matched domain(s) still need checking — Cloudflare limits how many detail lookups fit in one run, so this covers a batch each time (every 6 hours automatically, or click again now) until everyone's checked.`
+        : ' All matched domains are checked and up to date.';
+      note.textContent = `✓ Synced just now — checked ${body.processedThisRun} of ${body.matchedDomainsTotal} matched domain(s) this run (${body.totalCached} total cached).${remainingNote} Reload the page to see updated visit info.`;
     } catch (err) {
       note.textContent = originalNote;
       alert('Sync failed — network error. Try again in a moment.');

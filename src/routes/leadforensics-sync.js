@@ -35,14 +35,22 @@ export async function runLeadForensicsSync(env) {
     ...domainsFromLeads(state.sychemLeads),
   ]);
 
+  // Merge into whatever's already cached rather than replace it - each run
+  // only has budget to check a fraction of matched domains (see
+  // MAX_DETAIL_LOOKUPS_PER_RUN in leadForensics.js), so overwriting
+  // wholesale would forget every domain outside this run's own batch.
+  const cacheRow = await env.DB.prepare("SELECT data FROM leadforensics_cache WHERE id = 1").first();
+  const existingCache = cacheRow ? JSON.parse(cacheRow.data) : {};
+
   let result;
   try {
-    result = await syncVisitsForDomains(env, targetDomains);
+    result = await syncVisitsForDomains(env, targetDomains, existingCache);
   } catch (e) {
     return { synced: false, reason: "query_failed", detail: String((e && e.message) || e) };
   }
 
-  const dataText = JSON.stringify(result.visitsByDomain);
+  const merged = { ...existingCache, ...result.updates };
+  const dataText = JSON.stringify(merged);
   await env.DB.prepare(
     `INSERT INTO leadforensics_cache (id, data, synced_at) VALUES (1, ?, ?)
      ON CONFLICT(id) DO UPDATE SET data = excluded.data, synced_at = excluded.synced_at`
@@ -50,8 +58,10 @@ export async function runLeadForensicsSync(env) {
 
   return {
     synced: true,
-    matchCount: Object.keys(result.visitsByDomain).length,
-    businessesScanned: result.businessesScanned,
+    processedThisRun: result.processedThisRun,
+    remainingToCheck: result.remainingToCheck,
+    matchedDomainsTotal: result.matchedDomainsTotal,
+    totalCached: Object.keys(merged).length,
     pulledOn: result.pulledOn,
   };
 }

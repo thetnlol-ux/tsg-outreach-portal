@@ -132,6 +132,23 @@ Separate from, and does not touch, the `tsg-portal` repo/Worker/database.
   `ZOOMINFO_CLIENT_SECRET`) before it'll do anything; without it, the
   route reports `not_configured` rather than failing silently.
 
+  **Known real-world constraint, confirmed on the first live run against
+  the actual board:** Cloudflare caps subrequests (`fetch()` calls) per
+  Worker invocation at 50. A full sync's cheap pagination scan is only
+  ~6-10 calls, but this board matched 152 unique domains on its first
+  run (far more than the original hand sweep's "2 of 241", because that
+  sweep only checked cold leads while this checks every contact across
+  both brands - a known customer's engineer researching a spec is a real
+  signal too) — checking all of them would need ~300 more calls, way
+  over the cap. So each run only fetches visit detail for a capped batch
+  (`MAX_DETAIL_LOOKUPS_PER_RUN` in `leadForensics.js`, currently 18),
+  prioritising whichever matched domains haven't been checked yet or
+  were checked longest ago, and merges those results into whatever's
+  already cached rather than replacing it wholesale. Full coverage of a
+  large match set takes several runs (a few cron cycles, or a few clicks
+  of "Sync" in a row) rather than one — the button's status text says
+  how many are left to check.
+
 ## What changed from the original artifact
 
 The original saved edits (call notes, mailshot-sent flags, opt-outs) by
