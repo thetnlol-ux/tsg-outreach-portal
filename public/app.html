@@ -1525,7 +1525,8 @@ async function checkZoomInfoCompany(brand, i, id){
     });
     const body = await r.json();
     if(!body.checked){
-      host.innerHTML = '<div class="cc-flag">⚠ Could not check ZoomInfo — try again in a moment.</div>';
+      const detail = body.detail ? ` (${body.detail.replace(/</g,'&lt;').slice(0,300)})` : '';
+      host.innerHTML = `<div class="cc-flag">⚠ Could not check ZoomInfo — try again in a moment.${detail}</div>`;
       return;
     }
     if(!body.matches || !body.matches.length){
