@@ -28,10 +28,12 @@ import { runSoql } from "../shared/salesforce.js";
 // plainly in "why", same as the rest of this board handles "nothing real
 // was found".
 //
-// Only candidates scoring above MIN_SCORE are returned at all - below that
-// bar isn't worth a rep's review time. Structurally, a full-marks candidate
-// needs a real role match AND a clean Salesforce cross-check to clear it -
-// see the score breakdown below for why.
+// NOTE (18 Sep): no score floor here right now - it was removed at the
+// user's request. The scoring above is also known to be too coarse (job
+// role match + Salesforce status are really the only two things that vary
+// candidate to candidate, so most candidates land on the same number) -
+// pending a rework once the original colleague's sourcing/scoring logic is
+// available to compare against.
 
 const KEYWORDS = [
   "Food Production",
@@ -53,7 +55,6 @@ const CONTACT_OUTPUT_FIELDS = [
 ];
 
 const APPLICATION_MATCH_BASELINE = 10; // see the file-level comment above
-const MIN_SCORE = 60;
 
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json" } });
@@ -148,12 +149,6 @@ export async function handleZoomInfoSourceLeads(request, env) {
       // candidate nobody could cross-check against Salesforce shouldn't be
       // treated as equally confident as one that's genuinely confirmed clear.
       const customerProfileScore = customerCheck.checked ? 20 : 10;
-      // Even a perfect role match can't clear MIN_SCORE without a clean
-      // Salesforce check behind it (10 + 15 + 10 + 0 + 20 = 55 < 60) - skip
-      // the whole company now rather than spend free/paid API calls on a
-      // lead that can never pass the filter below.
-      const bestPossibleScore = 20 + 15 + APPLICATION_MATCH_BASELINE + 0 + customerProfileScore;
-      if (bestPossibleScore <= MIN_SCORE) continue;
 
       // Try each target role in turn, merging by contact id, until we have
       // a couple of real candidates or run out of roles to try.
@@ -177,13 +172,10 @@ export async function handleZoomInfoSourceLeads(request, env) {
         .slice(0, 3);
 
       // Role match is judged from the free contact search's own jobTitle,
-      // not enrich's - it's the same title either way, and this lets the
-      // MIN_SCORE filter below run BEFORE spending a single paid enrich
-      // credit on a company that can't clear it.
+      // not enrich's - it's the same title either way.
       const jobRoleScore = topContacts.some(([, meta]) => ROLE_KEYWORDS.some((k) => (meta.jobTitle || "").toLowerCase().includes(k)))
         ? 20 : 10;
       const score = jobRoleScore + 15 + APPLICATION_MATCH_BASELINE + 0 + customerProfileScore;
-      if (score <= MIN_SCORE) continue;
 
       let enrichedByPersonId = new Map();
       try {

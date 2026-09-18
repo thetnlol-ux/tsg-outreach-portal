@@ -67,20 +67,22 @@ Separate from, and does not touch, the `tsg-portal` repo/Worker/database.
   below 10; clicking it searches ZoomInfo by industry/size, cross-checks
   Salesforce, enriches real contact details for whoever matches a target
   role, and lists candidates for review — nothing is added to the board
-  without a click. Two things worth knowing: (1) unlike the free checks
-  above, this **spends real ZoomInfo credits** — contact enrichment
-  (`/contacts/enrich`) is a paid, per-contact call, capped at 15 new
-  candidates per click regardless of how many are actually missing, and
-  the route estimates a candidate's score from free data first so it can
-  skip anyone who can't clear the bar below before spending a credit on
-  them; (2) only candidates scoring **above 60/100** are ever returned —
-  the score is a deliberately honest, lower placeholder than a hand-
+  without a click. Worth knowing: unlike the free checks above, this
+  **spends real ZoomInfo credits** — contact enrichment (`/contacts/
+  enrich`) is a paid, per-contact call, capped at 15 new candidates per
+  click regardless of how many are actually missing. The score it gives
+  each candidate is a deliberately honest, lower placeholder than a hand-
   researched lead's (product-application fit is a structural inference —
   e.g. "beverage manufacturing generally involves fluid transfer", not a
   verified fact about this specific company — and news/funding signal is a
-  flat 0, since nothing here checks for it), which means a candidate needs
-  both a real role match AND a clean Salesforce cross-check to clear 60 at
-  all; anything weaker is silently filtered out rather than shown. Tapflo
+  flat 0, since nothing here checks for it). **Known issue (18 Sep):** job
+  role match and Salesforce status are really the only two things that vary
+  candidate to candidate right now, so most candidates land on the same
+  score — this scoring is due a rework once the original colleague's
+  sourcing/scoring methodology (used for this board's first 494 leads,
+  which ran noticeably faster than this route does) is available to
+  compare against. No score floor is applied — every candidate that clears
+  the company/role/Salesforce filters is returned for review. Tapflo
   only for now — Sychem's
   Salesforce dedupe has a known licensing gap and its own targeting
   criteria (quality/technical/decontamination roles) haven't been set up.
