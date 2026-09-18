@@ -51,6 +51,15 @@ Separate from, and does not touch, the `tsg-portal` repo/Worker/database.
   "Control Centre" link on `/dashboard`.
 - `src/routes/disconnect.js` — lets a person redo either connection from
   scratch if it ends up pointing at the wrong account.
+- `src/routes/salesforce-check-account.js`, `zoominfo-check-company.js`,
+  `outlook-check-contact.js`, `src/shared/zoominfo.js`,
+  `src/shared/outlookMail.js` — the three live checks on the outreach desk
+  (`/api/salesforce/check-account`, `/api/zoominfo/check-company`,
+  `/api/outlook/check-contact`): "Check Salesforce" and "Check ZoomInfo"
+  are per-lead (a company-level dedupe/enrichment query), "Check Outlook"
+  is per-contact (searches the signed-in rep's own connected mailbox for
+  prior correspondence with that specific person). All three return
+  candidate matches for a human to judge — never a silent yes/no.
 - `migrations/0001_init.sql`, `0002_connections.sql` — the D1 tables this
   needs (`portal_state`, plus `users`/`salesforce_connections`/
   `outlook_connections`/`activity_log` for the API connections). Already
@@ -74,15 +83,16 @@ lead data itself — is untouched.
 
 ## Known limitations / what's still manual
 
-- **"Refresh leads" and lead enrichment are still a manual, Claude-in-the-
-  loop workflow.** The board's refresh button copies a prompt to the
-  clipboard for pasting into a separate Claude chat that has Salesforce/
-  Outlook/ZoomInfo connectors — there's no code here doing live enrichment
-  yet. Salesforce and Outlook are now connected per-person (see above),
-  but nothing in the dashboard's own logic calls them yet — that's the
-  next step, once there's a concrete feature to point them at (e.g. a live
-  "already emailed"/"already a customer" check). ZoomInfo and Lead
-  Forensics aren't connected at all yet.
+- **"Refresh leads" and lead scoring/drafting are still a manual, Claude-
+  in-the-loop workflow.** The board's refresh button copies a prompt to
+  the clipboard for pasting into a separate Claude chat — there's no code
+  here doing that end-to-end automatically yet. The three live checks
+  ("Check Salesforce", "Check ZoomInfo", "Check Outlook" — see above) are
+  real, working, on-demand queries against each rep's own connections;
+  fully automating "Refresh leads" itself (scoring new leads, drafting
+  outreach) would need the Claude/Anthropic API wired in directly, which
+  is a separate, bigger piece of work, deliberately deferred pending real
+  usage of the check buttons. Lead Forensics isn't connected at all yet.
   That prompt's final instruction now tells you to bring the result back
   to this repo (paste the updated `tapfloLeads`/`sychemLeads`/
   `MAILSHOT_SENT`/`NEVER_CONTACT` into the portal, or hand it to Claude

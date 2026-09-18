@@ -12,6 +12,7 @@ import { handleOutlookConnect } from "./routes/outlook-connect.js";
 import { handleOutlookCallback } from "./routes/outlook-callback.js";
 import { handleDisconnectSalesforce, handleDisconnectOutlook } from "./routes/disconnect.js";
 import { handleSalesforceCheckAccount } from "./routes/salesforce-check-account.js";
+import { handleOutlookCheckContact } from "./routes/outlook-check-contact.js";
 import { verifySession, readCookie } from "./shared/session.js";
 
 // Small router: /auth/*, /connect/*, /dashboard and /api/* are the only
@@ -72,6 +73,11 @@ export default {
     if (url.pathname === "/api/zoominfo/check-company") {
       if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
       return handleZoomInfoCheckCompany(request, env);
+    }
+
+    if (url.pathname === "/api/outlook/check-contact") {
+      if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+      return handleOutlookCheckContact(request, env);
     }
 
     if (url.pathname === "/api/me") {

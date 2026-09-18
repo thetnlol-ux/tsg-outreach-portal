@@ -1544,6 +1544,48 @@ async function checkZoomInfoCompany(brand, i, id){
   }
 }
 
+// Live "have we already emailed this person?" check against the signed-in
+// rep's own connected Outlook mailbox - contact-level (unlike the
+// lead-level Salesforce/ZoomInfo checks above), since "already emailed" is
+// a per-person question, not a per-company one.
+async function checkOutlookContact(brand, i, ci, id){
+  const l = (brand==='tf' ? tapfloLeads : sychemLeads)[i];
+  const c = l.contacts[ci];
+  const host = document.getElementById(`olCheck-${id}-${ci}`);
+  if(!host || !c || !c.email) return;
+  host.innerHTML = '<span class="call-notes-hint">Checking Outlook…</span>';
+  try{
+    const r = await fetch('/api/outlook/check-contact', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({contactEmail: c.email}),
+    });
+    const body = await r.json();
+    if(!body.checked){
+      const msg = body.reason === 'not_connected'
+        ? 'Connect Outlook first (see the Connections page) to run this check.'
+        : body.reason === 'unavailable'
+        ? 'Could not read your Outlook mailbox for this check right now.'
+        : 'Could not check Outlook — try again in a moment.';
+      const detail = body.detail ? ` (${body.detail.replace(/</g,'&lt;').slice(0,300)})` : '';
+      host.innerHTML = `<div class="cc-flag">⚠ ${msg}${detail}</div>`;
+      return;
+    }
+    if(!body.messages || !body.messages.length){
+      host.innerHTML = `<div style="color:var(--good);font-size:12.5px;">✓ No prior emails found with ${c.email.replace(/</g,'&lt;')} in your Outlook mailbox.</div>`;
+      return;
+    }
+    host.innerHTML = `<div class="cc-flag">⚠ ${body.messages.length} prior email${body.messages.length>1?'s':''} found with this contact:</div>` +
+      body.messages.slice(0,5).map(m => `
+      <div class="call-note-entry">
+        <span class="cn-date">${m.received ? new Date(m.received).toLocaleDateString() : ''}</span>
+        <strong>${(m.subject||'(no subject)').replace(/</g,'&lt;')}</strong>${m.from ? ` — from ${m.from.replace(/</g,'&lt;')}` : ''}
+      </div>`).join('');
+  }catch(e){
+    host.innerHTML = '<div class="cc-flag">⚠ Check failed — network error.</div>';
+  }
+}
+
 function renderLeadColumn(containerId, leads, brand, countElId){
   const body = document.getElementById(containerId);
   if(!body){ updateNavBadges(); return; }
@@ -1645,6 +1687,9 @@ function renderLeadColumn(containerId, leads, brand, countElId){
                   </div>
                   <p style="font-size:10.5px;color:var(--muted-soft);margin-top:6px;">${rec.note}</p>
                   ${l.emailFlag && c===primary ? `<div class="cc-flag">⚠ ${l.emailFlag}</div>` : ''}
+                  <div id="olCheck-${id}-${ci}">
+                    ${c.email ? `<button class="copy-btn" onclick="event.stopPropagation(); checkOutlookContact('${brand}',${i},${ci},'${id}');">📬 Check Outlook</button>` : `<span class="call-notes-hint">No email on file — nothing to search Outlook for.</span>`}
+                  </div>
                   <div class="person-draft" onclick="event.stopPropagation();">
                     <div class="draft-lbl">Subject</div>
                     <input class="draft-subject-input" id="draftSubj-${id}-${ci}" value="${personalSubject.replace(/"/g,'&quot;')}" oninput="coldDraftEdited('${brand}',${i},${ci});">
