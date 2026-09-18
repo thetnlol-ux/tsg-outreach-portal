@@ -5290,10 +5290,21 @@ function msLink(href, text){
   return `<a href="${href}" style="color:${TAPFLO_BLUE}; text-decoration:underline;"`
        + `><span style="color:${TAPFLO_BLUE};">${text}</span></a>`;
 }
+// 18 Sep, real test send: with no height set, a blocked image collapsed to
+// a zero-height box in the recipient's client - nothing on screen hinted a
+// picture belonged there at all, so nobody knew to click "download
+// pictures". A fixed height (we don't have each image's real one, so a
+// generic 3:2 photo ratio) reserves that space regardless, and a light
+// fill colour plus styled alt text turns the reserved box into a visible
+// placeholder - Outlook's own rendering engine draws background-color and
+// the alt text inside an <img>'s box before the real image loads, a
+// standard HTML-email trick for exactly this.
 function msImg(src, alt, w){
-  return `<img src="${src}" alt="${(alt||'').replace(/"/g,'&quot;')}" width="${w}" border="0"
-     style="display:block; width:${w}px; max-width:100%; height:auto; border:0; outline:none;
-            text-decoration:none; -ms-interpolation-mode:bicubic;">`;
+  const h = Math.round(w * 2 / 3);
+  return `<img src="${src}" alt="${(alt||'Image').replace(/"/g,'&quot;')}" width="${w}" height="${h}" border="0"
+     style="display:block; width:${w}px; height:${h}px; max-width:100%; background-color:#eef2fb;
+            color:#5a6b78; font-family:Arial,Helvetica,sans-serif; font-size:13px; text-align:center;
+            border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic;">`;
 }
 
 function msParts(s){
