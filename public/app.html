@@ -1508,6 +1508,41 @@ async function checkSalesforceAccount(brand, i, id){
   }
 }
 
+// Live company data from ZoomInfo's free Search endpoint, to compare
+// against the static employees/revenue/location baked into the lead at
+// last edit. No credits spent - deliberately not calling the paid Enrich
+// endpoint, since Search already returns everything this check needs.
+async function checkZoomInfoCompany(brand, i, id){
+  const l = (brand==='tf' ? tapfloLeads : sychemLeads)[i];
+  const host = document.getElementById(`ziCheck-${id}`);
+  if(!host) return;
+  host.innerHTML = '<span class="call-notes-hint">Checking ZoomInfo…</span>';
+  try{
+    const r = await fetch('/api/zoominfo/check-company', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({companyName: l.company}),
+    });
+    const body = await r.json();
+    if(!body.checked){
+      host.innerHTML = '<div class="cc-flag">⚠ Could not check ZoomInfo — try again in a moment.</div>';
+      return;
+    }
+    if(!body.matches || !body.matches.length){
+      host.innerHTML = `<div style="color:var(--good);font-size:12.5px;">No ZoomInfo match found for "${l.company.replace(/</g,'&lt;')}".</div>`;
+      return;
+    }
+    const loc = (m)=> [m.city, m.state, m.country].filter(Boolean).join(', ');
+    host.innerHTML = body.matches.map(m => `
+      <div class="call-note-entry">
+        <strong>${(m.name||'').replace(/</g,'&lt;')}</strong>${m.website ? ` — ${m.website.replace(/</g,'&lt;')}` : ''}<br>
+        ${m.employeeCount ? `${m.employeeCount} employees` : 'employee count not on file'}${m.revenue ? ` · revenue ${m.revenue}` : ''}${loc(m) ? ` · ${loc(m).replace(/</g,'&lt;')}` : ''}
+      </div>`).join('');
+  }catch(e){
+    host.innerHTML = '<div class="cc-flag">⚠ Check failed — network error.</div>';
+  }
+}
+
 function renderLeadColumn(containerId, leads, brand, countElId){
   const body = document.getElementById(containerId);
   if(!body){ updateNavBadges(); return; }
@@ -1646,6 +1681,13 @@ function renderLeadColumn(containerId, leads, brand, countElId){
             <div id="sfCheck-${id}">
               <button class="copy-btn" onclick="event.stopPropagation(); checkSalesforceAccount('${brand}',${i},'${id}');">🔍 Check Salesforce</button>
               <div class="call-notes-hint">Live query against your own connected Salesforce org - not the static note above, which was only true as of whenever this board was last edited.</div>
+            </div>
+          </div>
+          <div class="ld-block">
+            <h4><span class="tag">ZOOMINFO COMPANY DATA</span></h4>
+            <div id="ziCheck-${id}">
+              <button class="copy-btn" onclick="event.stopPropagation(); checkZoomInfoCompany('${brand}',${i},'${id}');">🔎 Check ZoomInfo</button>
+              <div class="call-notes-hint">Live search against ZoomInfo (free - no credits spent) to compare against the size/revenue/location baked into this lead at last edit.</div>
             </div>
           </div>
           <div class="ld-block">
