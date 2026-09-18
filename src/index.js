@@ -11,6 +11,7 @@ import { handleSalesforceCallback } from "./routes/salesforce-callback.js";
 import { handleOutlookConnect } from "./routes/outlook-connect.js";
 import { handleOutlookCallback } from "./routes/outlook-callback.js";
 import { handleDisconnectSalesforce, handleDisconnectOutlook } from "./routes/disconnect.js";
+import { handleSalesforceCheckAccount } from "./routes/salesforce-check-account.js";
 import { verifySession, readCookie } from "./shared/session.js";
 
 // Small router: /auth/*, /connect/*, /dashboard and /api/* are the only
@@ -61,6 +62,11 @@ export default {
       if (request.method === "GET") return handleGetState(request, env);
       if (request.method === "POST") return handleSaveState(request, env);
       return new Response("Method not allowed", { status: 405 });
+    }
+
+    if (url.pathname === "/api/salesforce/check-account") {
+      if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+      return handleSalesforceCheckAccount(request, env);
     }
 
     // Temporary smoke test for the ZoomInfo Client Credentials wiring -

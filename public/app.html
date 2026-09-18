@@ -1474,6 +1474,40 @@ function inCascadeContacts(l){
    missing container rather than deleting the code path, so a call with a
    container that isn't on the page is a no-op instead of a thrown TypeError
    that would kill every const declared after it in this single script block. */
+// The desk's first live Salesforce check - queries the signed-in rep's own
+// connected org for a matching Account, rather than trusting the static
+// "already checked as of last edit" note baked into the lead's own copy.
+async function checkSalesforceAccount(brand, i, id){
+  const l = (brand==='tf' ? tapfloLeads : sychemLeads)[i];
+  const host = document.getElementById(`sfCheck-${id}`);
+  if(!host) return;
+  host.innerHTML = '<span class="call-notes-hint">Checking Salesforce…</span>';
+  try{
+    const r = await fetch('/api/salesforce/check-account', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({companyName: l.company}),
+    });
+    const body = await r.json();
+    if(!body.checked){
+      const msg = body.reason === 'not_connected'
+        ? 'Connect Salesforce first (see the Connections page) to run this check.'
+        : body.reason === 'org_not_configured'
+        ? "Salesforce isn't set up for your organisation yet."
+        : 'Could not check Salesforce — try again in a moment.';
+      host.innerHTML = `<div class="cc-flag">⚠ ${msg}</div>`;
+      return;
+    }
+    if(!body.matches || !body.matches.length){
+      host.innerHTML = `<div style="color:var(--good);font-size:12.5px;">✓ No matching Salesforce Account found for "${l.company.replace(/</g,'&lt;')}".</div>`;
+    } else {
+      host.innerHTML = `<div class="cc-flag">⚠ Possible existing customer — Salesforce Account match${body.matches.length>1?'es':''}: ${body.matches.map(m=>m.name.replace(/</g,'&lt;')).join(', ')}</div>`;
+    }
+  }catch(e){
+    host.innerHTML = '<div class="cc-flag">⚠ Check failed — network error.</div>';
+  }
+}
+
 function renderLeadColumn(containerId, leads, brand, countElId){
   const body = document.getElementById(containerId);
   if(!body){ updateNavBadges(); return; }
@@ -1606,6 +1640,13 @@ function renderLeadColumn(containerId, leads, brand, countElId){
               ${(l.scoreBits||[]).map(b=>`<div class="sb-row"><span>${b[0]}</span><div class="sb-track"><div class="sb-fill" style="width:${(b[1]/b[2])*100}%"></div></div><span class="mono">${b[1]}/${b[2]}</span></div>`).join('')}
             </div>
             <p style="margin-top:8px;">${primary.accuracy ? `Contact accuracy score (ZoomInfo): <strong>${primary.accuracy}/99</strong>` : 'No ZoomInfo accuracy score: this lead came from the mail history, not from sourcing.'}${l.revenue ? ` · Revenue band: <strong>${l.revenue}</strong>` : ''}</p>
+          </div>
+          <div class="ld-block">
+            <h4><span class="tag">ALREADY A CUSTOMER?</span></h4>
+            <div id="sfCheck-${id}">
+              <button class="copy-btn" onclick="event.stopPropagation(); checkSalesforceAccount('${brand}',${i},'${id}');">🔍 Check Salesforce</button>
+              <div class="call-notes-hint">Live query against your own connected Salesforce org - not the static note above, which was only true as of whenever this board was last edited.</div>
+            </div>
           </div>
           <div class="ld-block">
             <h4><span class="tag">SIMILAR WORK WE'VE DONE</span></h4>
