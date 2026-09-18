@@ -8,6 +8,12 @@
     --line:#DDE3E2; --line-strong:#C7D0CE; --muted:#5B6B75; --muted-soft:#8B98A1;
 
     --tapflo:#004B87; --tapflo-deep:#00335C; --tapflo-soft:#E3EEF6; --tapflo-accent:#00AEEF;
+    /* 18 Sep: real Tapflo brand values, pulled from tapflopumps.co.uk's own
+       stylesheet (--main-blue is rgb(0,75,135), exactly --tapflo already -
+       confirms the existing blue was accurate). --tapflo-yellow is their
+       real primary-CTA yellow (rgb(247,234,72)), new here - used sparingly
+       as a brand accent, not a wash of colour. */
+    --tapflo-yellow:#F7EA48;
     --sychem:#1F7A4D; --sychem-deep:#155934; --sychem-soft:#E1F1E7; --sychem-accent:#4FD1A5;
 
     --good:#1F9D6C; --good-soft:#E4F5EE; --warn:#D98E23; --warn-soft:#F5E6CC;
@@ -98,15 +104,27 @@
   .ms-reason b{display:block; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--bad); margin-bottom:3px;}
   .ms-heldcard.unverified .ms-reason b{color:var(--warn);}
 
-  /* ---------- Top chrome ---------- */
+  /* ---------- Top chrome ----------
+     18 Sep: was a generic dark-navy dashboard gradient (#0B1F2B/#1B2A38),
+     nothing to do with Tapflo's own brand. Now the real brand blue, the
+     real logo, and the yellow used exactly once as a small accent pill -
+     matching tapflopumps.co.uk rather than looking like an unrelated
+     internal tool. */
   .topbar{
-    background:linear-gradient(135deg,#0B1F2B 0%,#1B2A38 100%);
-    color:#fff; padding:22px clamp(16px,4vw,48px) 20px; position:relative; overflow:hidden;
+    background:linear-gradient(135deg,var(--tapflo) 0%,var(--tapflo-deep) 100%);
+    color:#fff; padding:18px clamp(16px,4vw,48px) 20px; position:relative; overflow:hidden;
   }
   .topbar::after{content:""; position:absolute; right:-60px; top:-90px; width:340px; height:340px; border-radius:50%; border:1px solid rgba(255,255,255,.08); pointer-events:none;}
-  .eyebrow{text-transform:uppercase; letter-spacing:.14em; font-size:11px; font-weight:600; color:#7fd6ff; display:flex; align-items:center; gap:8px; position:relative; z-index:1;}
-  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:#7fd6ff;box-shadow:0 0 0 3px rgba(127,214,255,.25);}
-  .title-row{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; margin-top:8px; flex-wrap:wrap; position:relative; z-index:1;}
+  .brand-row{display:flex; align-items:center; gap:10px; position:relative; z-index:1;}
+  /* The real logo file is Tapflo's own brand blue on transparent, illegible
+     on this same-hue dark bar - inverted to white, the standard trick for
+     placing a single-colour mark on a dark header rather than sourcing or
+     hosting a separate white variant. */
+  .brand-logo{height:26px; width:auto; display:block; filter:brightness(0) invert(1);}
+  .brand-tag{display:inline-flex; align-items:center; font-weight:700; font-size:11px; letter-spacing:.06em;
+    color:var(--tapflo-deep); background:var(--tapflo-yellow); padding:3px 9px; border-radius:99px;}
+  .eyebrow{text-transform:uppercase; letter-spacing:.1em; font-size:10.5px; font-weight:600; color:rgba(255,255,255,.55);}
+  .title-row{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; margin-top:14px; flex-wrap:wrap; position:relative; z-index:1;}
   h1.pagehead{font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:clamp(28px,4vw,40px); line-height:.95; margin:4px 0 0; letter-spacing:-.01em;}
   .sub{color:rgba(255,255,255,.68); font-size:13px; max-width:560px; margin-top:6px; line-height:1.5;}
 
@@ -125,7 +143,7 @@
     font-size:13px; padding:10px 18px; border-radius:10px; cursor:pointer; transition:background .15s,color .15s;
     position:relative;
   }
-  .switch-btn.active{background:#fff; color:var(--ink);}
+  .switch-btn.active{background:#fff; color:var(--ink); box-shadow:inset 0 -3px 0 var(--tapflo-yellow);}
   .switch-btn:not(.active):hover{color:#fff; background:rgba(255,255,255,.12);}
   /* Small red "things to do" count badge on the two actionable nav tabs —
      Cold Lead Action Desk (fresh leads not yet touched) and Follow-Up List
@@ -393,7 +411,13 @@
   .refresh-wrap{display:flex; flex-direction:column; align-items:flex-end; gap:4px;}
   .refresh-btn{border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.08); color:#fff; font-family:'Inter',sans-serif; font-weight:600; font-size:12.5px; padding:9px 16px; border-radius:10px; cursor:pointer; display:inline-flex; align-items:center; gap:7px; text-decoration:none; transition:background .15s;}
   .refresh-btn:hover{background:rgba(255,255,255,.18);}
-  .refresh-note{font-size:9.5px; color:rgba(255,255,255,.5); max-width:220px; text-align:right; line-height:1.4;}
+  /* 18 Sep: JS writes live sync status into these (last-synced time,
+     "Syncing…", results), so the element itself has to stay - collapsed to
+     one truncated line by default instead of a permanent 3-4 line
+     paragraph per button, full text on hover rather than always on screen. */
+  .refresh-note{font-size:9.5px; color:rgba(255,255,255,.5); max-width:220px; text-align:right; line-height:1.4;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:default;}
+  .refresh-note:hover{overflow:visible; white-space:normal; position:relative; z-index:5; background:var(--tapflo-deep); padding:4px 6px; border-radius:6px; margin:-4px -6px;}
 
   /* ================= FOLLOW-UP LIST ================= */
   #followupView{display:none;}
@@ -751,7 +775,11 @@
 </div>
 
 <div class="topbar">
-  <div class="eyebrow"><span class="dot"></span>TSG · OUTREACH PORTAL · INTERNAL
+  <div class="brand-row">
+    <img class="brand-logo" src="https://www.tapflopumps.co.uk/app/uploads/2025/02/Tapflo-Pumps-UK-Logo.png" alt="Tapflo">
+    <span class="brand-tag">OUTREACH PORTAL</span>
+  </div>
+  <div class="eyebrow" style="display:flex; align-items:center; margin-top:6px;">TSG · INTERNAL
     <span id="whoAmI" style="margin-left:auto; font-weight:500; letter-spacing:normal; text-transform:none;"></span>
   </div>
   <div class="title-row">
