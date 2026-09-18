@@ -1722,7 +1722,12 @@ function renderLeadColumn(containerId, leads, brand, countElId){
     // candidates pushed the count back over 10 mid-review - only hide when
     // there's nothing left on screen to decide on.
     const reviewInProgress = !!(resultsHost && resultsHost.innerHTML.trim());
-    if(wrap) wrap.style.display = (visible.length < 10 || reviewInProgress) ? 'block' : 'none';
+    // 18 Sep, Steve's own request: always show this for his account
+    // specifically so he can test the feature without the real board
+    // needing to genuinely drop below 10 first. Nobody else gets this -
+    // the real <10 trigger still applies for every other signed-in rep.
+    const testOverride = !!(__WHOAMI__ && (__WHOAMI__.email || '').toLowerCase() === 'steve.smith@tapflopumps.co.uk');
+    if(wrap) wrap.style.display = (visible.length < 10 || reviewInProgress || testOverride) ? 'block' : 'none';
   }
   updateNavBadges();
   body.innerHTML = visible.map(({l, i})=>{
