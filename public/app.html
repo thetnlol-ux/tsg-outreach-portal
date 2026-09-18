@@ -115,7 +115,8 @@
     color:#fff; padding:18px clamp(16px,4vw,48px) 20px; position:relative; overflow:hidden;
   }
   .topbar::after{content:""; position:absolute; right:-60px; top:-90px; width:340px; height:340px; border-radius:50%; border:1px solid rgba(255,255,255,.08); pointer-events:none;}
-  .brand-row{display:flex; align-items:center; gap:10px; position:relative; z-index:1;}
+  .brand-row{display:flex; align-items:flex-start; gap:10px; position:relative; z-index:1;}
+  .brand-stack{display:flex; flex-direction:column; align-items:flex-start; gap:6px;}
   /* The real logo file is Tapflo's own brand blue on transparent, illegible
      on this same-hue dark bar - inverted to white, the standard trick for
      placing a single-colour mark on a dark header rather than sourcing or
@@ -123,7 +124,6 @@
   .brand-logo{height:26px; width:auto; display:block; filter:brightness(0) invert(1);}
   .brand-tag{display:inline-flex; align-items:center; font-weight:700; font-size:11px; letter-spacing:.06em;
     color:var(--tapflo-deep); background:var(--tapflo-yellow); padding:3px 9px; border-radius:99px;}
-  .eyebrow{text-transform:uppercase; letter-spacing:.1em; font-size:10.5px; font-weight:600; color:rgba(255,255,255,.55);}
   .title-row{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; margin-top:14px; flex-wrap:wrap; position:relative; z-index:1;}
   h1.pagehead{font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:clamp(28px,4vw,40px); line-height:.95; margin:4px 0 0; letter-spacing:-.01em;}
   .sub{color:rgba(255,255,255,.68); font-size:13px; max-width:560px; margin-top:6px; line-height:1.5;}
@@ -776,11 +776,11 @@
 
 <div class="topbar">
   <div class="brand-row">
-    <img class="brand-logo" src="https://www.tapflopumps.co.uk/app/uploads/2025/02/Tapflo-Pumps-UK-Logo.png" alt="Tapflo">
-    <span class="brand-tag">OUTREACH PORTAL</span>
-  </div>
-  <div class="eyebrow" style="display:flex; align-items:center; margin-top:6px;">TSG · INTERNAL
-    <span id="whoAmI" style="margin-left:auto; font-weight:500; letter-spacing:normal; text-transform:none;"></span>
+    <div class="brand-stack">
+      <img class="brand-logo" src="https://www.tapflopumps.co.uk/app/uploads/2025/02/Tapflo-Pumps-UK-Logo.png" alt="Tapflo">
+      <span class="brand-tag">OUTREACH PORTAL</span>
+    </div>
+    <span id="whoAmI" style="margin-left:auto; font-weight:500;"></span>
   </div>
   <div class="title-row">
     <div>
