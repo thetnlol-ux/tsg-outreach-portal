@@ -4942,15 +4942,18 @@ function msLink(href, text){
 }
 // 18 Sep, real test send: with no height set, a blocked image collapsed to
 // a zero-height box in the recipient's client - nothing on screen hinted a
-// picture belonged there at all, so nobody knew to click "download
-// pictures". A fixed height (we don't have each image's real one, so a
-// generic 3:2 photo ratio) reserves that space regardless, and a light
-// fill colour plus styled alt text turns the reserved box into a visible
-// placeholder - Outlook's own rendering engine draws background-color and
-// the alt text inside an <img>'s box before the real image loads, a
-// standard HTML-email trick for exactly this.
+// picture belonged there at all. Giving the <img> itself a fixed height and
+// a light fill colour (msImg below) helps in classic desktop Outlook, but a
+// second real test showed New Outlook (WebView2-based, not the old Word
+// engine) replaces a blocked <img> with its own small generic placeholder
+// and ignores the image's own background-color/alt styling entirely. The
+// one thing that still survives that: colouring the CONTAINING TABLE CELL,
+// not just the image - msImgHeight is exported so callers can size that
+// cell to match, so there's a visible box regardless of what happens to the
+// <img> tag inside it.
+function msImgHeight(w){ return Math.round(w * 2 / 3); }
 function msImg(src, alt, w){
-  const h = Math.round(w * 2 / 3);
+  const h = msImgHeight(w);
   return `<img src="${src}" alt="${(alt||'Image').replace(/"/g,'&quot;')}" width="${w}" height="${h}" border="0"
      style="display:block; width:${w}px; height:${h}px; max-width:100%; background-color:#eef2fb;
             color:#5a6b78; font-family:Arial,Helvetica,sans-serif; font-size:13px; text-align:center;
@@ -5037,7 +5040,7 @@ function buildBrandedMailshot(s){
   const bullets = c.bullets.map(b =>
     `<tr><td style="font-family:${A}; font-size:14px; color:#555555; padding-bottom:8px; line-height:1.55;">`
     + (b.h ? `<strong style="color:#111111;">${b.h}</strong> ` : '') + b.t + `</td></tr>`).join('\n');
-  const hero = c.img ? `<tr><td style="padding:0; line-height:0;">${msImg(c.img, c.imgAlt, 598)}</td></tr>` : '';
+  const hero = c.img ? `<tr><td height="${msImgHeight(598)}" style="padding:0; line-height:0; background-color:#eef2fb;">${msImg(c.img, c.imgAlt, 598)}</td></tr>` : '';
   const meta = c.published
     ? `<div style="font-family:${A}; font-size:11px; color:#6b7a85; margin-top:6px;">Published ${ukDate(c.published)}</div>` : '';
   const extraA = c.extra
