@@ -31,19 +31,7 @@ export async function refreshOutlookToken(env, connection) {
   return { accessToken: tokens.access_token, refreshToken: tokens.refresh_token || connection.refresh_token };
 }
 
-// Returns an array of recent messages (either direction) with contactEmail,
-// or null if there's nothing usable to search with - no Outlook connection
-// for this rep, or the mailbox itself can't be read via Graph. Callers
-// treat null the same as "no correspondence available" - never an error.
-export async function fetchRecentCorrespondence(env, userId, contactEmail, limit = 15) {
-  if (!contactEmail) return null;
-  const connection = await env.DB.prepare(
-    "SELECT access_token, refresh_token FROM outlook_connections WHERE user_id = ?"
-  )
-    .bind(userId)
-    .first();
-  if (!connection) return null;
-
+async function searchOneMailbox(env, userId, connection, contactEmail, limit) {
   const search = (token) =>
     fetch(
       `https://graph.microsoft.com/v1.0/me/messages?$search="participants:${encodeURIComponent(contactEmail)}"&$top=${limit}&$select=subject,from,receivedDateTime,bodyPreview`,
@@ -75,4 +63,54 @@ export async function fetchRecentCorrespondence(env, userId, contactEmail, limit
     subject: m.subject || "",
     preview: m.bodyPreview || "",
   }));
+}
+
+// Returns an array of recent messages (either direction) with contactEmail,
+// or null if there's nothing usable to search with - no Outlook connection
+// for this rep, or the mailbox itself can't be read via Graph. Callers
+// treat null the same as "no correspondence available" - never an error.
+export async function fetchRecentCorrespondence(env, userId, contactEmail, limit = 15) {
+  if (!contactEmail) return null;
+  const connection = await env.DB.prepare(
+    "SELECT access_token, refresh_token FROM outlook_connections WHERE user_id = ?"
+  )
+    .bind(userId)
+    .first();
+  if (!connection) return null;
+  return searchOneMailbox(env, userId, connection, contactEmail, limit);
+}
+
+// The "Sent Items, across Aidan, Jay and Beth" dedupe gate from the real
+// sourcing methodology (see zoominfo-source-leads.js) - checks every
+// mailbox that's actually connected via Outlook right now, not just the
+// signed-in rep's own. Whoever hasn't connected simply isn't covered - this
+// returns which emails/user ids were actually checked alongside the
+// results, so callers can say plainly "checked Aidan + Jay, not Beth"
+// rather than imply full coverage that was never real.
+export async function fetchCorrespondenceAcrossConnectedMailboxes(env, contactEmail, limit = 10) {
+  if (!contactEmail) return { checkedMailboxes: [], matches: [] };
+  const rows = await env.DB.prepare(
+    `SELECT oc.user_id, oc.access_token, oc.refresh_token, u.email, u.display_name
+     FROM outlook_connections oc JOIN users u ON u.id = oc.user_id`
+  ).all();
+
+  const checkedMailboxes = [];
+  const matches = [];
+  for (const row of rows.results || []) {
+    checkedMailboxes.push(row.email);
+    let messages;
+    try {
+      messages = await searchOneMailbox(
+        env, row.user_id,
+        { access_token: row.access_token, refresh_token: row.refresh_token },
+        contactEmail, limit
+      );
+    } catch (e) {
+      messages = null;
+    }
+    if (messages && messages.length) {
+      matches.push({ mailbox: row.email, displayName: row.display_name, messages });
+    }
+  }
+  return { checkedMailboxes, matches };
 }

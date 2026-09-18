@@ -133,3 +133,17 @@ export async function enrichContacts(env, matchPersonInput, outputFields) {
     },
   });
 }
+
+// Free (Search endpoint) real news/hiring/funding signals on a company -
+// this is what the original sourcing methodology's "search_scoops" source
+// note refers to. Confirmed for real: most small/mid UK companies return
+// nothing (matches the methodology's own "4 in 5 score zero honestly"
+// finding), but it's a genuine signal, not a stub - a real company like
+// PepsiCo returns real dated items with a topic (e.g. "Layoffs") and a
+// link. No credit cost confirmed the same way company/contact search
+// aren't - this is the free tier, unlike contact enrichment.
+export async function searchScoops(env, criteria) {
+  return callApi(env, "/scoops/search", {
+    data: { type: "ScoopSearch", attributes: criteria },
+  });
+}

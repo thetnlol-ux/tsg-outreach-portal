@@ -61,29 +61,49 @@ Separate from, and does not touch, the `tsg-portal` repo/Worker/database.
   prior correspondence with that specific person). All three return
   candidate matches for a human to judge — never a silent yes/no.
 - `src/routes/zoominfo-source-leads.js` (`/api/zoominfo/source-leads`) —
-  Tapflo's "top the desk back up to 50 whenever it drops below 10" rule
-  (a footnote on the Tapflo column, from an earlier manual refresh round).
-  A "Source more leads" button appears on the Tapflo column once it's
-  below 10; clicking it searches ZoomInfo by industry/size, cross-checks
-  Salesforce, enriches real contact details for whoever matches a target
-  role, and lists candidates for review — nothing is added to the board
-  without a click. Worth knowing: unlike the free checks above, this
-  **spends real ZoomInfo credits** — contact enrichment (`/contacts/
-  enrich`) is a paid, per-contact call, capped at 15 new candidates per
-  click regardless of how many are actually missing. The score it gives
-  each candidate is a deliberately honest, lower placeholder than a hand-
-  researched lead's (product-application fit is a structural inference —
-  e.g. "beverage manufacturing generally involves fluid transfer", not a
-  verified fact about this specific company — and news/funding signal is a
-  flat 0, since nothing here checks for it). **Known issue (18 Sep):** job
-  role match and Salesforce status are really the only two things that vary
-  candidate to candidate right now, so most candidates land on the same
-  score — this scoring is due a rework once the original colleague's
-  sourcing/scoring methodology (used for this board's first 494 leads,
-  which ran noticeably faster than this route does) is available to
-  compare against. No score floor is applied — every candidate that clears
-  the company/role/Salesforce filters is returned for review. Tapflo
-  only for now — Sychem's
+  Tapflo's "top the desk back up to 50 whenever it drops below 10" rule.
+  Rewritten 18 Sep to follow the real sourcing methodology a colleague
+  wrote up from the actual 213-lead/453-contact board, rather than the
+  ad-hoc first version. A "Source more leads" button appears on the
+  Tapflo column once it's below 10; clicking it runs the same shape as a
+  real refresh:
+  - **Sector-targeted, not open-ended.** The board is already over target
+    on food & drink (62% vs a 55% target), so this only searches chemical
+    manufacturing, industrial, and waste/effluent/environmental — the
+    three sectors currently under their target share — one bare
+    ZoomInfo `industryKeywords` term per call (confirmed unreliable
+    combined).
+  - **Four dedupe gates**: Salesforce Accounts by name, Salesforce
+    Contacts by email/domain, the board itself, and Sent Items across
+    every *connected* mailbox (Aidan and Jay right now — Beth has never
+    signed into the portal, so her mailbox can't be checked; each
+    candidate says plainly which mailboxes were actually covered). Gate 4
+    is a simplified version of the real one — it drops an already-emailed
+    contact rather than classifying it into active/excluded/startable the
+    way a full refresh does.
+  - **"No email, no lead"**: a contact search can return real people, but
+    if nobody survives with a real email, the company isn't sourced at
+    all — never with a weak contact as filler.
+  - **"No mobiles" is the real rule** (business email + direct dial +
+    switchboard) but this ZoomInfo plan disallows requesting `directPhone`
+    on contact enrichment outright (a genuine "contact your Account
+    Manager" rejection) — mobile is used as a flagged fallback instead,
+    noted honestly on every contact rather than pretending the real rule
+    was followed.
+  - **Scoring genuinely varies now**: job role match (core vs secondary
+    title for the sector), industry/application fit (fixed per sector,
+    reflecting how directly that sector's real duties match Tapflo's
+    product range per the methodology), a real news/funding check against
+    ZoomInfo's Scoops endpoint (most companies still score 0 — confirmed
+    for real, only a minority of UK SMEs have any Scoops coverage at all),
+    and customer-profile match (similarity to that sector's real end-user
+    closed-won base, not a restatement of the Salesforce dedupe outcome).
+  Worth knowing: unlike the free checks above, this **spends real
+  ZoomInfo credits** — contact enrichment (`/contacts/enrich`) is a paid,
+  per-contact call, capped at 15 new candidates per click regardless of
+  how many are actually missing; the real methodology's own numbers (a
+  ~10% hit rate sourcing this sector mix) mean hitting "need" in full
+  takes several clicks, not one. Tapflo only — Sychem's
   Salesforce dedupe has a known licensing gap and its own targeting
   criteria (quality/technical/decontamination roles) haven't been set up.
 - `migrations/0001_init.sql`, `0002_connections.sql` — the D1 tables this
