@@ -3443,6 +3443,42 @@ function fuCopyLiveText(brand, idx, ci, btnEl){
   copyPlainText(live.newBody, btnEl);
 }
 
+// Real send, straight from the signed-in rep's own connected mailbox via
+// Microsoft Graph (see /api/outlook/send) - live.body already includes the
+// quoted-original block below the new message, same content the mailto:
+// link above sends, just actually transmitted instead of opened for you to
+// send by hand. Not offered for the isMailshot cascade stage (see the
+// template above) - that one sends the richer formatted case-study email
+// via "Copy formatted email" instead, a separate path this doesn't cover.
+async function fuSendRealEmail(brand, idx, ci, btn){
+  const live = fuDraftLive(brand, idx, ci);
+  if(!live) return;
+  const email = live.info.contact.email;
+  if(!email){ alert('No email on file for this contact.'); return; }
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try{
+    const res = await fetch('/api/outlook/send', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({to: email, subject: live.subject, body: live.body, contentType: 'Text'}),
+    });
+    const result = await res.json();
+    if(!result.sent){
+      const msg = result.reason === 'not_connected'
+        ? 'Connect Outlook first (see the Connections page) to send from here.'
+        : 'Send failed' + (result.detail ? ': ' + result.detail.slice(0,200) : '')
+          + ' - if your Outlook connection predates this feature, reconnecting it (Connections page) usually fixes this.';
+      alert(msg);
+      btn.disabled = false; btn.textContent = label;
+      return;
+    }
+    completeOutreach(brand, idx, ci, live.info.stageKey, live.info.isBOH);
+  }catch(e){
+    alert('Send failed - network error.');
+    btn.disabled = false; btn.textContent = label;
+  }
+}
+
 function renderFollowUpControl(c, brand, idx, ci){
   const fu = c.followUp || {status:'not_started', history:[]};
   if(fu.status === 'not_started'){
@@ -4070,6 +4106,7 @@ function renderFollowUpList(){
           ${readLink ? `<div class="fu-placeholder-flag" style="color:var(--good);">🔎 Or use the button below — it opens ${readLinkIsLatest ? 'the actual last email you sent them' : 'the real original email'} in Outlook in this browser (using whatever account you're already signed into here — sign in if prompted and it'll land you straight on it), so you can click Outlook's own real Reply All.</div>` : ''}
         </div>
         <div class="fu-actions">
+          ${!isMailshot ? `<button class="fu-btn positive" onclick="fuSendRealEmail('${brand}',${idx},${ci},this);">📧 Send Email</button>` : ''}
           <button class="fu-btn send" onclick="fuOpenOutlook('${brand}',${idx},${ci});">📧 Open in Outlook — Reply-All: ${state.displayLabel}</button>
           ${readLink ? `<button class="fu-btn" onclick="openReadLinkWindow('${attrUrl(readLink)}');">🔎 Open ${readLinkIsLatest ? 'Last Sent Email' : 'Original Email'} in Outlook (new window)</button>` : ''}
           ${!isMailshot ? `<button class="fu-btn" onclick="fuCopyLiveText('${brand}',${idx},${ci}, this);">📋 Copy email text</button>` : ''}
