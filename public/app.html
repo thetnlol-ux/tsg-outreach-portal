@@ -516,22 +516,36 @@
   .conv-email-meta{font-size:11.5px; color:var(--muted);}
   .conv-email-body{background:#F5F9FB; border-radius:10px; padding:12px 16px; font-size:12.5px; line-height:1.6; white-space:pre-wrap;}
   /* ---------- Suggested Mailshots: the wider machine-matched sweep ---------- */
-  .mm-tools{display:flex; flex-direction:column; gap:10px; margin:14px 0 18px;}
-  .mm-chiprow{display:flex; flex-wrap:wrap; gap:6px; align-items:center;}
+  /* 18 Sep: was one unlabelled block - sector chips on their own row, then
+     age chips + all 3 toggles + search crammed onto a second row with no
+     grouping. Now a bordered toolbar card with one labelled row per filter
+     kind, so it reads as "Sector / Age / Show / Search" rather than a wall
+     of buttons. */
+  .mm-toolbar{background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:14px 16px; margin:14px 0 18px; display:flex; flex-direction:column; gap:10px;}
+  .mm-toolrow{display:flex; flex-wrap:wrap; gap:7px; align-items:center;}
+  .mm-chiprow{display:flex; flex-wrap:wrap; gap:6px; align-items:center;} /* still used by the page-kind filter chips (mm-pskinds) */
+  .mm-toollabel{font:700 10px/1 Inter,system-ui,sans-serif; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--muted-soft); min-width:50px;}
   .mm-chip{font:600 12px/1 Inter,system-ui,sans-serif; color:var(--ink);
     background:var(--panel); border:1px solid var(--line-strong); border-radius:999px;
     padding:7px 12px; cursor:pointer; display:inline-flex; gap:6px; align-items:center;}
   .mm-chip:hover{border-color:#8fa3a0;}
-  .mm-chip.on{background:var(--ink); color:#fff; border-color:var(--ink);}
+  .mm-chip.on{background:var(--tapflo); color:#fff; border-color:var(--tapflo);}
   .mm-chip span{font:600 11px/1 'Roboto Mono',monospace; opacity:.65;}
   .mm-chip.on span{opacity:.8;}
   .mm-band{border-style:dashed;}
-  .mm-toggle{font:500 12px/1 Inter,system-ui,sans-serif; color:#4a5a58;
-    display:inline-flex; gap:6px; align-items:center; cursor:pointer;}
-  .mm-search{font:500 12px/1 Inter,system-ui,sans-serif; padding:7px 10px;
-    border:1px solid var(--line-strong); border-radius:6px; min-width:230px;
+  .mm-toggle{font:600 12px/1 Inter,system-ui,sans-serif; color:var(--ink);
+    background:var(--panel); border:1px solid var(--line-strong); border-radius:999px;
+    padding:7px 12px; display:inline-flex; gap:6px; align-items:center; cursor:pointer;}
+  .mm-toggle:hover{border-color:#8fa3a0;}
+  .mm-toggle:has(input:checked){background:var(--tapflo-soft); border-color:var(--tapflo); color:var(--tapflo-deep);}
+  .mm-toggle input{margin:0;}
+  .mm-search{font:500 12px/1 Inter,system-ui,sans-serif; padding:8px 12px;
+    border:1px solid var(--line-strong); border-radius:6px; min-width:260px;
     background:var(--panel); color:var(--ink);}
-  .mm-count{font:600 11px/1 'Roboto Mono',monospace; color:#6b7a78; letter-spacing:.04em;}
+  .mm-count{font:600 11px/1 'Roboto Mono',monospace; color:#6b7a78; letter-spacing:.04em;
+    display:flex; align-items:center; gap:10px;}
   .mm-list{display:flex; flex-direction:column; gap:6px;}
   .mm-row{border:1px solid var(--line); border-radius:8px; background:var(--panel);
     overflow:hidden;}
@@ -5793,18 +5807,27 @@ function renderMailshotMatched(){
       ${MS_STATS.deadAddresses} dead addresses came out of the inbox sweeps, and where a
       company had a live address as well the suggestion moved onto that one rather than
       disappearing.</p>
-    <div class="mm-tools">
-      <div class="mm-chiprow"><button class="mm-chip${MS_FILTER.tech==='all'?' on':''}" data-mmtech="all">Everything<span>${MAILSHOT_MATCHED.length}</span></button>${chips}</div>
-      <div class="mm-chiprow">${bands}
-        <label class="mm-toggle"><input type="checkbox" id="mmCav" ${MS_FILTER.caveats?'checked':''}> show the ${cav} with a caveat</label>
-        <label class="mm-toggle"><input type="checkbox" id="mmPortal" ${MS_FILTER.portalOnly?'checked':''}> only ones on the board</label>
-        <label class="mm-toggle"><input type="checkbox" id="mmTodo" ${MS_FILTER.todo?'checked':''}> hide the ones I have sent</label>
-        <input class="mm-search" id="mmQ" type="search" placeholder="Find a company, person, address or topic" value="${MS_FILTER.q}">
+    <div class="mm-toolbar">
+      <div class="mm-toolrow">
+        <span class="mm-toollabel">Sector</span>
+        <button class="mm-chip${MS_FILTER.tech==='all'?' on':''}" data-mmtech="all">Everything<span>${MAILSHOT_MATCHED.length}</span></button>${chips}
       </div>
-      <div class="mm-count">${vis.length} showing &middot; ${
-        MAILSHOT_MATCHED.filter(x=>msSentCount(x)===msRecipients(x).length).length
-      } companies done &middot; ${Object.keys(MS_SENT).length} individual sends logged
-        ${msUnsentVisibleCount() ? `<button class="mm-shuffle" style="margin-left:10px;" onclick="msSendAllStart()">&#9654; Send all (${msUnsentVisibleCount()} left)</button>` : ''}
+      <div class="mm-toolrow">
+        <span class="mm-toollabel">Age</span>${bands}
+      </div>
+      <div class="mm-toolrow">
+        <span class="mm-toollabel">Show</span>
+        <label class="mm-toggle"><input type="checkbox" id="mmCav" ${MS_FILTER.caveats?'checked':''}> the ${cav} with a caveat</label>
+        <label class="mm-toggle"><input type="checkbox" id="mmPortal" ${MS_FILTER.portalOnly?'checked':''}> only ones on the board</label>
+        <label class="mm-toggle"><input type="checkbox" id="mmTodo" ${MS_FILTER.todo?'checked':''}> hide the ones I've sent</label>
+      </div>
+      <div class="mm-toolrow" style="justify-content:space-between;">
+        <input class="mm-search" id="mmQ" type="search" placeholder="Find a company, person, address or topic" value="${MS_FILTER.q}">
+        <div class="mm-count">${vis.length} showing &middot; ${
+          MAILSHOT_MATCHED.filter(x=>msSentCount(x)===msRecipients(x).length).length
+        } done &middot; ${Object.keys(MS_SENT).length} sent
+          ${msUnsentVisibleCount() ? `<button class="mm-shuffle" onclick="msSendAllStart()">&#9654; Send all (${msUnsentVisibleCount()} left)</button>` : ''}
+        </div>
       </div>
     </div>
     ${msNeverDrawer()}
