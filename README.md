@@ -106,11 +106,31 @@ Separate from, and does not touch, the `tsg-portal` repo/Worker/database.
   takes several clicks, not one. Tapflo only — Sychem's
   Salesforce dedupe has a known licensing gap and its own targeting
   criteria (quality/technical/decontamination roles) haven't been set up.
-- `migrations/0001_init.sql`, `0002_connections.sql` — the D1 tables this
-  needs (`portal_state`, plus `users`/`salesforce_connections`/
-  `outlook_connections`/`activity_log` for the API connections). Already
-  applied to the `tsg-outreach-portal-db` database created for this
-  project.
+- `migrations/0001_init.sql`, `0002_connections.sql`, `0003_leadforensics.sql`
+  — the D1 tables this needs (`portal_state`; `users`/
+  `salesforce_connections`/`outlook_connections`/`activity_log` for the API
+  connections; `leadforensics_cache` for the sync below). Already applied
+  to the `tsg-outreach-portal-db` database created for this project.
+- `src/shared/leadForensics.js`, `src/routes/leadforensics-sync.js`,
+  `leadforensics-visits.js` (`/api/leadforensics/sync`, `/api/
+  leadforensics/visits`) — replaces the hand-pulled `LF_VISITS` snapshot
+  in `app.html` (dated 17 Sep) with a live sync, per Aidan's own note that
+  "when this portal is on our server it will pull this information in
+  real time." Lead Forensics' API only goes one direction — "who visited
+  the site in this date range" (paginated, no name/domain filter) — never
+  "did company X visit" on demand, confirmed against their real API
+  (`GetBusiness` only takes a numeric ID). So this pages through every
+  recent site visitor (confirmed working at `pagesize=1000` — ~90 days of
+  Tapflo's traffic is ~5,900 businesses, so ~6 calls) and matches by
+  domain against the board, the same shape as the original hand sweep.
+  Runs automatically every 6 hours via a Cloudflare Cron Trigger (see
+  `scheduled()` in `src/index.js` and `triggers.crons` in
+  `wrangler.jsonc`), well inside their 1000-calls/day limit, or on demand
+  via the "Sync Lead Forensics" button. Needs `LEADFORENSICS_CLIENT_ID`
+  (a plain var, already in `wrangler.jsonc`) and `LEADFORENSICS_API_KEY`
+  (a secret — add it via the Cloudflare dashboard, same as
+  `ZOOMINFO_CLIENT_SECRET`) before it'll do anything; without it, the
+  route reports `not_configured` rather than failing silently.
 
 ## What changed from the original artifact
 

@@ -29,10 +29,20 @@
     { "pattern": "outreach.tsgroup.cloud", "custom_domain": true }
   ],
 
+  // Background Lead Forensics sync (src/shared/leadForensics.js) - every
+  // 6 hours is comfortably inside their 1000-calls/day limit (a full sync
+  // is ~6 GetAllBusinesses calls plus one GetVisitsByBusiness/
+  // GetPagesByVisit pair per genuine domain match, which real-world usage
+  // suggests is a small number).
+  "triggers": {
+    "crons": ["0 */6 * * *"]
+  },
+
   // Not sensitive - safe to keep here in the repo, same as tsg-portal.
-  // MS_PRIVATE_KEY_PKCS8, SESSION_SECRET and the two
-  // SALESFORCE_CLIENT_SECRET_* values are added as encrypted secrets via
-  // the Cloudflare dashboard instead, never committed to the repo.
+  // MS_PRIVATE_KEY_PKCS8, SESSION_SECRET, the two
+  // SALESFORCE_CLIENT_SECRET_* values and LEADFORENSICS_API_KEY are added
+  // as encrypted secrets via the Cloudflare dashboard instead, never
+  // committed to the repo.
   "vars": {
     "MS_CLIENT_ID": "b4d0b124-c075-4387-9e07-4c0d1bf9a4d2",
     "MS_REDIRECT_URI": "https://outreach.tsgroup.cloud/auth/callback",
@@ -41,6 +51,7 @@
     "ALLOWED_EMAIL_DOMAINS": "tapflopumps.co.uk,sychem.co.uk",
     "ADMIN_EMAILS": "steve.smith@tapflopumps.co.uk",
     "ZOOMINFO_CLIENT_ID": "0oa17n6sjtuKIlRLo698",
+    "LEADFORENSICS_CLIENT_ID": "216527",
 
     // Sychem isn't wired up yet (licensing) - only Tapflo's vars are set,
     // so resolveSalesforceOrg() cleanly reports "not set up yet" for a

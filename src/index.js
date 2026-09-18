@@ -14,6 +14,8 @@ import { handleDisconnectSalesforce, handleDisconnectOutlook } from "./routes/di
 import { handleSalesforceCheckAccount } from "./routes/salesforce-check-account.js";
 import { handleOutlookCheckContact } from "./routes/outlook-check-contact.js";
 import { handleZoomInfoSourceLeads } from "./routes/zoominfo-source-leads.js";
+import { handleLeadForensicsSync, runLeadForensicsSync } from "./routes/leadforensics-sync.js";
+import { handleGetLeadForensicsVisits } from "./routes/leadforensics-visits.js";
 import { verifySession, readCookie } from "./shared/session.js";
 
 // Small router: /auth/*, /connect/*, /dashboard and /api/* are the only
@@ -86,6 +88,16 @@ export default {
       return handleZoomInfoSourceLeads(request, env);
     }
 
+    if (url.pathname === "/api/leadforensics/sync") {
+      if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+      return handleLeadForensicsSync(request, env);
+    }
+
+    if (url.pathname === "/api/leadforensics/visits") {
+      if (request.method !== "GET") return new Response("Method not allowed", { status: 405 });
+      return handleGetLeadForensicsVisits(request, env);
+    }
+
     if (url.pathname === "/api/me") {
       const session = await verifySession(readCookie(request, "session"), env.SESSION_SECRET);
       if (!session) {
@@ -98,5 +110,16 @@ export default {
     }
 
     return env.ASSETS.fetch(request);
+  },
+
+  // The "real time" half of the Lead Forensics sync (see
+  // src/shared/leadForensics.js) - Aidan's own note was that once this
+  // portal is on its own server, website-visit data should stop being a
+  // hand-pulled snapshot. Runs with no signed-in user (there isn't one on
+  // a cron trigger), so it calls the plain function directly rather than
+  // the authenticated /api/leadforensics/sync route. See wrangler.jsonc
+  // for the schedule.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runLeadForensicsSync(env));
   },
 };
