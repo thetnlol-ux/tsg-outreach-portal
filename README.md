@@ -148,6 +148,43 @@ Separate from, and does not touch, the `tsg-portal` repo/Worker/database.
   large match set takes several runs (a few cron cycles, or a few clicks
   of "Sync" in a row) rather than one — the button's status text says
   how many are left to check.
+- `migrations/0004_mailshot_sync.sql`, `src/shared/mailshotSourcing.js`,
+  `mailshotMatching.js`, `src/routes/mailshot-sync.js`,
+  `mailshot-candidates.js` (`/api/mailshot/sync`, `/api/mailshot/
+  candidates`) — replaces the hand-pulled `MAILSHOT_MATCHED` snapshot
+  (02 Sep) and `SALESFORCE_BLOCKED` snapshot (17 Sep) in `app.html` with
+  a live sync. The biggest piece built this way so far, in two phases:
+  - **Discovery** (cheap): pages through every connected mailbox's Sent
+    Items (Aidan, Jay, Steve today), recording the most recent external
+    recipient domain per company — no per-message calls needed, Graph's
+    listing itself carries subject/recipients/date. Capped at
+    `MAX_PAGES_PER_MAILBOX_PER_RUN` (5) pages per mailbox per run and
+    resumed from a persisted `@odata.nextLink` cursor, for the same
+    reason as Lead Forensics: a mailbox's full history could be
+    thousands of messages, way past the 50-subrequest cap in one go.
+  - **Verification** (capped at `MAX_CANDIDATES_PER_RUN`, 10, per run):
+    only for discovered domains whose last contact is 40+ days ago (the
+    original "cold" threshold). Checks for a reply since (reusing the
+    same Graph `$search` pattern as Check Outlook — a reply excludes the
+    domain from bump candidates), checks Salesforce for an existing
+    Account (replacing `SALESFORCE_BLOCKED`, using whichever Tapflo
+    rep's Salesforce connection is available as the checking identity —
+    there's no signed-in user on a cron trigger), and looks up the real
+    company name via ZoomInfo's free company search
+    (`companyWebsite` — confirmed a valid search field for real).
+  - **Topic/content matching** is deliberately a plain keyword match
+    (`mailshotMatching.js`), not a fabricated "smart" read: the subject
+    line's significant words are matched against each tech category's
+    label, then against content titles/standfirsts, and the match count
+    itself sets the confidence tier. It reads the content library
+    (`MAILSHOT_CONTENT`/`MAILSHOT_TECHS`) straight out of the Worker's
+    own deployed `app.html` via the `ASSETS` binding rather than
+    duplicating ~160KB of blog/case-study copy into a second file that
+    would drift the moment one is edited and not the other.
+  Runs automatically every 6 hours via the same Cron Trigger as Lead
+  Forensics, or on demand via "Sync Suggested Mailshots". No new secrets
+  needed — reuses the Outlook, Salesforce and ZoomInfo connections
+  already set up for the other live features.
 
 ## What changed from the original artifact
 
