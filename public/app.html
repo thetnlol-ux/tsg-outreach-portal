@@ -70,8 +70,10 @@
   .ms-mail{padding:18px; background:#f2f2f0;}
   .ms-bar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px;}
   .ms-subbar{margin:-4px 0 12px; align-items:baseline;}
-  .ms-subj{flex:1 1 230px; font-size:13px; color:#3c4a52; background:#fff; border:1px solid #dcdcdc; border-radius:5px; padding:7px 10px;}
-  .ms-subj b{color:#111;}
+  .ms-subj{flex:1 1 230px; display:flex; align-items:center; gap:6px; font-size:13px; color:#3c4a52; background:#fff; border:1px solid #dcdcdc; border-radius:5px; padding:7px 10px;}
+  .ms-subj b{color:#111; white-space:nowrap;}
+  .ms-subj-input{all:unset; flex:1; min-width:0; font:inherit; color:#3c4a52; padding:2px 4px; border-radius:3px;}
+  .ms-subj-input:focus{background:#f4f6f5; outline:1px solid #8fa3a0;}
   .ms-copy{font-family:'Inter',sans-serif; font-size:13px; font-weight:600; cursor:pointer; background:#004b87;
            color:#fff; border:none; border-radius:5px; padding:9px 16px;}
   .ms-lite{font-family:'Inter',sans-serif; font-size:11.5px; cursor:pointer; background:transparent; color:#3c5a70;
@@ -562,11 +564,6 @@
   .mm-dead{background:#faf0e2; border-color:#ecd8b6;}
   .mm-viewbar{display:flex; gap:4px; padding:8px 12px; background:#f4f6f5;
     border-bottom:1px solid var(--line);}
-  .mm-view{all:unset; cursor:pointer; font:600 11.5px/1 Inter,system-ui,sans-serif;
-    color:var(--ink); background:var(--panel); border:1px solid var(--line-strong);
-    border-radius:5px; padding:6px 11px;}
-  .mm-view:hover{border-color:#8fa3a0;}
-  .mm-view.on{background:var(--ink); color:#fff; border-color:var(--ink);}
   .mm-thread{font-weight:600;}
   .mm-chip-ms{display:inline-block; background:#E3EEF6; color:#00335C;
     font:700 9px/1 Inter,system-ui,sans-serif; text-transform:uppercase; letter-spacing:.04em;
@@ -576,9 +573,6 @@
     display:block; margin:0 0 2px;}
   /* the plain email sits on white with room round it, not edge to edge */
   .ms-plain{background:#ffffff; padding:16px 18px;}
-  .mm-designbar{display:flex; gap:6px; align-items:center; flex-wrap:wrap;
-    padding:8px 12px; background:#f4f6f5; border-bottom:1px solid var(--line);}
-  .mm-designnote{font:500 10.5px/1.4 Inter,system-ui,sans-serif; color:#8a9997;}
   .mm-sent{all:unset; cursor:pointer; font:700 11.5px/1 Inter,system-ui,sans-serif;
     color:#2f6b41; background:#e3efe6; border:1px solid #b9d8c4; border-radius:6px;
     padding:8px 13px; white-space:nowrap;}
@@ -5350,11 +5344,6 @@ ${extraA}
 </td></tr></table>`;
 }
 
-/* Which design a row uses. Alternating on the row's position in the queue makes
-   the split exactly even and stable between reloads, which a random choice would
-   not be: he wants to compare the two, so the same company must not switch
-   design between one look at the board and the next. */
-function msDesignFor(i){ return (i % 2 === 0) ? 'tile' : 'branded'; }
 function buildMailshotFor(s, design){
   return design === 'branded' ? buildBrandedMailshot(s) : buildPlainMailshot(s);
 }
@@ -5440,10 +5429,15 @@ function msTopicPhrase(t){
    addressed to a group. */
 const MS_RCPT = {};
 
-/* Which design each row uses, and which rows Aidan has already marked as sent.
+/* 18 Sep: every mailshot now always uses the branded-panel design - the tile/
+   branded 50/50 split this used to alternate on was only ever there to compare
+   the two, and the answer was "always use the branded panel". MS_SUBJECT holds
+   a per-row hand-edited subject line, same session-only pattern as MS_PIC below
+   (not written into portal state - a fresh page load goes back to the computed
+   default, same as the picture/page picks do).
    MS_SENT is written into the portal state on save, so a tick survives a reload
    the same way a follow-up click does. */
-const MS_DESIGN = {};
+const MS_SUBJECT = {};
 
 /* 11/09, the picture picker. MS_PIC holds the filename Aidan chose for a row and
    MS_PIC_PAGE how far he has shuffled. Both are per row, because two companies
@@ -5658,9 +5652,11 @@ function msPicWindow(r){
 }
 const MS_SENT = (typeof MAILSHOT_SENT !== 'undefined' && MAILSHOT_SENT) ? MAILSHOT_SENT : {};
 
-function msIndexOf(r){ return MAILSHOT_MATCHED.indexOf(r); }
-function msDesign(r){
-  return MS_DESIGN[r.id] || msDesignFor(msIndexOf(r));
+function msDesign(r){ return 'branded'; }
+function msSubjectEdited(id, el){
+  MS_SUBJECT[id] = el.value;
+  const link = el.closest('.ms-mail') && el.closest('.ms-mail').querySelector('a.ms-lite[href^="mailto:"]');
+  if(link) link.href = 'mailto:' + link.dataset.mmTo + '?subject=' + encodeURIComponent(el.value);
 }
 function msSentKey(r, email){ return r.id + '|' + email; }
 function msIsSent(r, email){ return !!MS_SENT[msSentKey(r, email)]; }
@@ -5823,7 +5819,7 @@ function msFillBody(r){
      marked Lead Forensics. It appears there by itself the morning after a send
      is found in Sent Items. This row is the send and nothing else. */
   const design  = msDesign(r);
-  const subject = mailshotSubject(s);
+  const subject = (MS_SUBJECT[r.id] != null) ? MS_SUBJECT[r.id] : mailshotSubject(s);
   const body    = buildMailshotFor(s, design);
   const mailto  = 'mailto:' + who[0] + '?subject=' + encodeURIComponent(subject);
   const sentNow = msIsSent(r, who[0]);
@@ -5904,23 +5900,16 @@ function msFillBody(r){
                title="Go back to the picture the portal picked">Reset</button>` : ''}
            </div>
          </div>` ; })()}
-      <div class="mm-designbar">
-        <span class="mm-rcptlab">Design</span>
-        <button class="mm-view${design==='tile'?' on':''}" data-mmdesign="${r.id}|tile">Tile</button>
-        <button class="mm-view${design==='branded'?' on':''}" data-mmdesign="${r.id}|branded">Branded panel</button>
-        <span class="mm-designnote">${design===msDesignFor(msIndexOf(r))
-          ? 'the 50/50 split put this row on '+(design==='tile'?'the tile':'the branded panel')
-          : 'you changed this row by hand'}</span>
-      </div>
       <div class="ms-bar">
-        <div class="ms-subj"><b>Subject:</b> ${subject}</div>
+        <div class="ms-subj"><b>Subject:</b>
+          <input class="ms-subj-input" value="${subject.replace(/"/g,'&quot;')}" oninput="msSubjectEdited('${r.id}', this)"></div>
         <button class="ms-copy" data-mscopy="msmail-${s.id}" data-msmailto="${mailto}">Copy for Outlook</button>
         <button class="mm-sent${sentNow?' done':''}" data-mmsent="${r.id}|${sel}">${sentNow
           ? '&#10003; Sent '+(sentRec && sentRec.date ? sentRec.date : '')
           : 'Mailshot sent'}</button>
       </div>
       <div class="ms-bar ms-subbar">
-        <a class="ms-lite" href="${mailto}">Open empty draft</a>
+        <a class="ms-lite" href="${mailto}" data-mm-to="${who[0]}">Open empty draft</a>
         <button class="ms-lite" data-mssrc="msmail-${s.id}">Copy source</button>
         <span class="ms-hint">Copies the email <b>formatted</b>, then opens a draft to
           ${who[0]} with the subject filled in. Put the cursor in the body and press Ctrl+V.</span>
@@ -6029,7 +6018,7 @@ document.addEventListener('input', function(ev){
 
 document.addEventListener('click', function(ev){
   const t = ev.target && ev.target.closest
-    ? ev.target.closest('[data-mmtech],[data-mmband],[data-mmtoggle],[data-mmrcpt],[data-mmdesign],[data-mmsent],[data-mmnever],[data-mmunnever],[data-mmpic],[data-mmshuffle],[data-mmpicreset],[data-mmpage],[data-mmpagereset],[data-mmpskind],[data-mmgallery],[data-mmgpick],[data-mmgclose]') : null;
+    ? ev.target.closest('[data-mmtech],[data-mmband],[data-mmtoggle],[data-mmrcpt],[data-mmsent],[data-mmnever],[data-mmunnever],[data-mmpic],[data-mmshuffle],[data-mmpicreset],[data-mmpage],[data-mmpagereset],[data-mmpskind],[data-mmgallery],[data-mmgpick],[data-mmgclose]') : null;
   if(!t) return;
   /* Picking a picture re-renders the row body, and the body is the same node
      "Copy for Outlook" reads, so the choice is in Outlook on the very next
@@ -6097,12 +6086,6 @@ document.addEventListener('click', function(ev){
     const id = t.getAttribute('data-mmpicreset');
     const row = MAILSHOT_MATCHED.find(x=>x.id===id);
     if(row){ delete MS_PIC[id]; MS_PIC_PAGE[id] = 0; msFillBody(row); msPicSync(row); }
-    return;
-  }
-  if(t.hasAttribute('data-mmdesign')){
-    const [id, d] = t.getAttribute('data-mmdesign').split('|');
-    const row = MAILSHOT_MATCHED.find(x=>x.id===id);
-    if(row){ MS_DESIGN[id] = d; msFillBody(row); }
     return;
   }
   if(t.hasAttribute('data-mmunnever')){
