@@ -57,12 +57,19 @@ async function callApi(env, path, body) {
 // Basic company search - name/website/etc criteria in, a short list of
 // candidate companies (id, name, website, size) out. Use enrichCompany
 // with the chosen companyId to get the full record.
-export async function searchCompany(env, criteria, { page = 1, pageSize = 10 } = {}) {
-  return callApi(
-    env,
-    `/companies/search?page[number]=${page}&page[size]=${pageSize}`,
-    { data: { type: "CompanySearch", attributes: criteria } }
-  );
+//
+// Deliberately doesn't send page[number]/page[size] as query params -
+// confirmed for real that Cloudflare Workers' fetch() sends those
+// brackets in a way ZoomInfo's gateway rejects outright with a generic
+// 400 (curl sending the identical-looking URL works fine, so this is a
+// Workers-fetch-specific encoding quirk, not a ZoomInfo API problem).
+// ZoomInfo's own default page size (25) is already more than pageSize
+// ever needs, so this just takes the first N of that instead.
+export async function searchCompany(env, criteria, { pageSize = 10 } = {}) {
+  const result = await callApi(env, "/companies/search", {
+    data: { type: "CompanySearch", attributes: criteria },
+  });
+  return { ...result, data: (result.data || []).slice(0, pageSize) };
 }
 
 // Full company record for up to 25 companies at once, matched by
