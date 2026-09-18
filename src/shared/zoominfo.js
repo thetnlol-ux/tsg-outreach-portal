@@ -41,8 +41,10 @@ async function callApi(env, path, body) {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
+      // The data API is JSON:API - plain "application/json" gets a 406
+      // Not Acceptable (confirmed for real testing directly against it).
+      "Content-Type": "application/vnd.api+json",
+      Accept: "application/vnd.api+json",
     },
     body: JSON.stringify(body),
   });
