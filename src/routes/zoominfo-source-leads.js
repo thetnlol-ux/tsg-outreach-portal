@@ -18,11 +18,20 @@ import { runSoql } from "../shared/salesforce.js";
 // tile rather than a bare company name.
 //
 // Honesty matters more here than on a hand-researched lead: nothing below
-// invents a fact. Two of the five score metrics (product-application fit,
-// news/funding signal) are scored 0 because they genuinely weren't
-// checked - no human or model has read what each company actually makes,
-// and no news source is wired in. Say so plainly in "why", the same way
-// the rest of this board handles "nothing real was found".
+// invents a fact it can't back up. News/funding signal is scored 0 because
+// it genuinely wasn't checked - no news source is wired in. Product-
+// application fit gets a modest fixed baseline rather than 0 or a fabricated
+// verified-looking number: every industry keyword searched (food/beverage/
+// dairy/brewery/distillery/chemical/pharma manufacturing) structurally
+// involves fluid transfer or pumping, which is a defensible inference, but
+// nobody has confirmed this specific company's actual process - said
+// plainly in "why", same as the rest of this board handles "nothing real
+// was found".
+//
+// Only candidates scoring above MIN_SCORE are returned at all - below that
+// bar isn't worth a rep's review time. Structurally, a full-marks candidate
+// needs a real role match AND a clean Salesforce cross-check to clear it -
+// see the score breakdown below for why.
 
 const KEYWORDS = [
   "Food Production",
@@ -42,6 +51,9 @@ const ROLE_KEYWORDS = ["engineer", "engineering", "process", "production", "main
 const CONTACT_OUTPUT_FIELDS = [
   "id", "firstName", "lastName", "email", "jobTitle", "phone", "mobilePhone", "managementLevel",
 ];
+
+const APPLICATION_MATCH_BASELINE = 10; // see the file-level comment above
+const MIN_SCORE = 60;
 
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json" } });
@@ -132,6 +144,17 @@ export async function handleZoomInfoSourceLeads(request, env) {
       const customerCheck = await alreadyCustomerInSalesforce(env, session, name);
       if (customerCheck.checked && customerCheck.isCustomer) continue; // already a customer - don't source it as cold
 
+      // Full marks only when the Salesforce check actually ran clean - a
+      // candidate nobody could cross-check against Salesforce shouldn't be
+      // treated as equally confident as one that's genuinely confirmed clear.
+      const customerProfileScore = customerCheck.checked ? 20 : 10;
+      // Even a perfect role match can't clear MIN_SCORE without a clean
+      // Salesforce check behind it (10 + 15 + 10 + 0 + 20 = 55 < 60) - skip
+      // the whole company now rather than spend free/paid API calls on a
+      // lead that can never pass the filter below.
+      const bestPossibleScore = 20 + 15 + APPLICATION_MATCH_BASELINE + 0 + customerProfileScore;
+      if (bestPossibleScore <= MIN_SCORE) continue;
+
       // Try each target role in turn, merging by contact id, until we have
       // a couple of real candidates or run out of roles to try.
       const contactsFound = new Map();
@@ -153,6 +176,15 @@ export async function handleZoomInfoSourceLeads(request, env) {
         .sort((a, b) => (b[1].contactAccuracyScore || 0) - (a[1].contactAccuracyScore || 0))
         .slice(0, 3);
 
+      // Role match is judged from the free contact search's own jobTitle,
+      // not enrich's - it's the same title either way, and this lets the
+      // MIN_SCORE filter below run BEFORE spending a single paid enrich
+      // credit on a company that can't clear it.
+      const jobRoleScore = topContacts.some(([, meta]) => ROLE_KEYWORDS.some((k) => (meta.jobTitle || "").toLowerCase().includes(k)))
+        ? 20 : 10;
+      const score = jobRoleScore + 15 + APPLICATION_MATCH_BASELINE + 0 + customerProfileScore;
+      if (score <= MIN_SCORE) continue;
+
       let enrichedByPersonId = new Map();
       try {
         const enrichResult = await enrichContacts(
@@ -171,7 +203,6 @@ export async function handleZoomInfoSourceLeads(request, env) {
         .map(([id, meta]) => {
           const e = enrichedByPersonId.get(String(id));
           if (!e) return null;
-          const roleMatches = ROLE_KEYWORDS.some((k) => (e.jobTitle || "").toLowerCase().includes(k));
           return {
             name: `${e.firstName || ""} ${e.lastName || ""}`.trim() || "(name not on file)",
             title: e.jobTitle || meta.jobTitle || "(title not on file)",
@@ -184,16 +215,12 @@ export async function handleZoomInfoSourceLeads(request, env) {
               text: `Sourced automatically via ZoomInfo (industry search: "${keyword}"). Contact accuracy score ${meta.contactAccuracyScore ?? "not on file"}. Not manually verified — check role relevance before investing outreach time.`,
             }],
             followUp: { status: "not_started", history: [] },
-            _roleMatch: roleMatches,
           };
         })
         .filter(Boolean);
       if (!contacts.length) continue;
 
       const employeeCount = Number(co.attributes.employeeCount) || null;
-      const jobRoleScore = contacts.some((c) => c._roleMatch) ? 20 : 10;
-      const customerProfileScore = customerCheck.checked ? 20 : 10; // full marks only when the Salesforce check actually ran clean
-      const score = jobRoleScore + 15 + 0 + 0 + customerProfileScore;
 
       const salesforceNote = customerCheck.checked
         ? "Cross-checked against Salesforce Accounts: no match found."
@@ -206,17 +233,17 @@ export async function handleZoomInfoSourceLeads(request, env) {
         employees: employeeBandLabel(employeeCount),
         employeeCount,
         revenue: co.attributes.revenue || null,
-        contacts: contacts.map(({ _roleMatch, ...c }) => c),
+        contacts,
         companyPhone: null,
         score,
         scoreBits: [
           ["Job role match", jobRoleScore, 20],
           ["Product → industry match", 15, 20],
-          ["Product → application match", 0, 20],
+          ["Product → application match", APPLICATION_MATCH_BASELINE, 20],
           ["News / funding signal", 0, 20],
           ["Customer profile match", customerProfileScore, 20],
         ],
-        why: `Auto-sourced on ${todayStr()} via ZoomInfo company search (industry keyword "${keyword}", ${co.attributes.employeeCount || "unknown"} employees, UK). Role match and company size were checked programmatically; product-application fit was NOT checked — nobody has confirmed what fluids or processes this company actually runs, so treat that score honestly as unverified. ${salesforceNote} This is a rough placeholder score, well below the bar a hand-researched lead gets — verify before spending real outreach time on it.`,
+        why: `Auto-sourced on ${todayStr()} via ZoomInfo company search (industry keyword "${keyword}", ${co.attributes.employeeCount || "unknown"} employees, UK). Role match, company size and Salesforce status were checked programmatically. Product-application fit is a structural inference, not a verified one — ${keyword.toLowerCase()} generally involves fluid transfer/pumping, but nobody has confirmed this specific company's actual process. ${salesforceNote} This is a rough placeholder score, well below the bar a hand-researched lead gets — verify before spending real outreach time on it.`,
         news: `No dated news/funding signal found for ${name} this session — sourced automatically, no news search was run.`,
         pastWork: [],
         sources: [

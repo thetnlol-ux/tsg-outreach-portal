@@ -70,11 +70,18 @@ Separate from, and does not touch, the `tsg-portal` repo/Worker/database.
   without a click. Two things worth knowing: (1) unlike the free checks
   above, this **spends real ZoomInfo credits** — contact enrichment
   (`/contacts/enrich`) is a paid, per-contact call, capped at 15 new
-  candidates per click regardless of how many are actually missing; (2)
-  the score it gives each candidate is a deliberately honest, lower
-  placeholder than a hand-researched lead's — product-application fit and
-  any news/funding signal are scored 0 because nobody has actually checked
-  them, not because they're absent. Tapflo only for now — Sychem's
+  candidates per click regardless of how many are actually missing, and
+  the route estimates a candidate's score from free data first so it can
+  skip anyone who can't clear the bar below before spending a credit on
+  them; (2) only candidates scoring **above 60/100** are ever returned —
+  the score is a deliberately honest, lower placeholder than a hand-
+  researched lead's (product-application fit is a structural inference —
+  e.g. "beverage manufacturing generally involves fluid transfer", not a
+  verified fact about this specific company — and news/funding signal is a
+  flat 0, since nothing here checks for it), which means a candidate needs
+  both a real role match AND a clean Salesforce cross-check to clear 60 at
+  all; anything weaker is silently filtered out rather than shown. Tapflo
+  only for now — Sychem's
   Salesforce dedupe has a known licensing gap and its own targeting
   criteria (quality/technical/decontamination roles) haven't been set up.
 - `migrations/0001_init.sql`, `0002_connections.sql` — the D1 tables this
