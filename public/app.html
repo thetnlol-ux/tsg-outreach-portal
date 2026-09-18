@@ -74,6 +74,8 @@
   .ms-subj b{color:#111; white-space:nowrap;}
   .ms-subj-input{all:unset; flex:1; min-width:0; font:inherit; color:#3c4a52; padding:2px 4px; border-radius:3px;}
   .ms-subj-input:focus{background:#f4f6f5; outline:1px solid #8fa3a0;}
+  .ms-editzone{outline:1px dashed #b7c4c2; outline-offset:2px; border-radius:3px; cursor:text;}
+  .ms-editzone:focus{outline:1px dashed #4f7a72; background:rgba(79,122,114,.06);}
   .ms-copy{font-family:'Inter',sans-serif; font-size:13px; font-weight:600; cursor:pointer; background:#004b87;
            color:#fff; border:none; border-radius:5px; padding:9px 16px;}
   .ms-lite{font-family:'Inter',sans-serif; font-size:11.5px; cursor:pointer; background:transparent; color:#3c5a70;
@@ -1776,7 +1778,7 @@ function renderLeadColumn(containerId, leads, brand, countElId){
               <div class="multi-note">${actionableContacts.length} people at ${l.company} match the outreach criteria — approach each individually below.</div>
               <button class="open-all-btn" onclick="event.stopPropagation(); openAllOutlook('${brand}',${i});">📧 Open all ${actionableContacts.length} in Outlook</button>
               <button class="open-all-btn send-all-btn" onclick="event.stopPropagation(); coldSendAllStart('${brand}',${i});">▶ Send All</button>
-              <div class="multi-note">"Open all" pops open ${actionableContacts.length} Outlook drafts at once for you to send by hand. "Send All" walks through them one at a time instead — opens each draft, waits for you to confirm you've sent it, then starts that contact's follow-up tracking automatically before moving to the next.</div>
+              <div class="multi-note">"Open all" pops open ${actionableContacts.length} Outlook drafts at once for you to send by hand. "Send All" walks through them one at a time instead — review each draft, click Send to transmit it for real from your own mailbox, and it starts that contact's follow-up tracking automatically before moving to the next.</div>
             ` : ''}
             <div class="contacts-wrap">
               ${l.contacts.map((c,ci)=>({c,ci})).filter(({c})=>isColdContact(c)).map(({c,ci})=>{
@@ -1823,7 +1825,8 @@ function renderLeadColumn(containerId, leads, brand, countElId){
                       <span class="draft-edited-flag" id="draftEditedFlag-${id}-${ci}" style="display:${c.draftOverride?'inline':'none'};">✎ edited from the suggested wording</span>
                       <button class="draft-reset-btn" id="draftReset-${id}-${ci}" style="display:${c.draftOverride?'inline':'none'};" onclick="coldDraftReset('${brand}',${i},${ci});">Reset to suggested</button>
                     </div>
-                    <button class="copy-btn" onclick="coldOpenOutlook('${brand}',${i},${ci});">📧 Open in Outlook</button>
+                    ${c.email ? `<button class="copy-btn" onclick="coldSendRealEmail('${brand}',${i},${ci},this);">📧 Send Email</button>` : ''}
+                    <button class="copy-btn" onclick="coldOpenOutlook('${brand}',${i},${ci});">✉️ Open in Outlook</button>
                     ${!c.email ? `<span style="font-size:10px;color:var(--warn);margin-left:8px;">No email on file — opens blank, fill in the "To" field manually.</span>` : ''}
                     <div id="fuControl-${id}-${ci}">${renderFollowUpControl(c, brand, i, ci)}</div>
                   </div>
@@ -2126,6 +2129,47 @@ function coldOpenOutlook(brand, idx, ci){
   window.open(url, '_blank');
 }
 
+// Real send, straight from the signed-in rep's own connected mailbox via
+// Microsoft Graph (see /api/outlook/send). contentType is "Text" here - this
+// draft is a plain textarea, not the mailshot's HTML template, and Text
+// keeps its line breaks intact rather than collapsing them the way raw text
+// dropped into an HTML body would.
+async function coldSendRealEmail(brand, idx, ci, btn){
+  const l = (brand==='tf' ? tapfloLeads : sychemLeads)[idx];
+  const c = l.contacts[ci];
+  if(!c || !c.email){ alert('No email on file for this contact.'); return; }
+  const { subject, body } = coldDraftLive(brand, idx, ci);
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try{
+    const res = await fetch('/api/outlook/send', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({to: c.email, subject, body, contentType: 'Text'}),
+    });
+    const result = await res.json();
+    if(!result.sent){
+      const msg = result.reason === 'not_connected'
+        ? 'Connect Outlook first (see the Connections page) to send from here.'
+        : 'Send failed' + (result.detail ? ': ' + result.detail.slice(0,200) : '')
+          + ' - if your Outlook connection predates this feature, reconnecting it (Connections page) usually fixes this.';
+      alert(msg);
+      btn.disabled = false; btn.textContent = label;
+      return;
+    }
+    startFollowUp(brand, idx, ci); // marks it sent + starts the cascade, same as coldSendAllNext used to
+    // Part of the Send All walk (see coldSendAllAdvance) - a real send IS the
+    // confirmation now, so it advances the queue itself.
+    if(SEND_ALL && SEND_ALL.kind === 'coldlead' && SEND_ALL.brand === brand && SEND_ALL.idx === idx
+       && SEND_ALL.queue[SEND_ALL.pos] === ci){
+      SEND_ALL.pos++;
+      coldSendAllAdvance();
+    }
+  }catch(e){
+    alert('Send failed - network error.');
+    btn.disabled = false; btn.textContent = label;
+  }
+}
+
 /* Send All for the Cold Lead Action Desk — same human-paced pattern as the
    mailshot and follow-up Send All queues (see SEND_ALL below): opens one
    draft, waits for an explicit "Sent — next" click before starting that
@@ -2163,20 +2207,15 @@ function coldSendAllAdvance(){
   // Sent or removed by some other means since the queue was built — skip
   // rather than draft the same person twice.
   if(!c || !isColdContact(c)){ SEND_ALL.pos++; coldSendAllAdvance(); return; }
-  coldOpenOutlook(brand, idx, ci);
+  // 18 Sep: real sending replaced the open-a-draft-then-click-"Sent, next"
+  // step - clicking Send here calls the exact same coldSendRealEmail used on
+  // a single contact, which advances this queue itself on success (see
+  // there). Still one deliberate click per contact, on purpose.
   sendAllBarShow(`<b>${SEND_ALL.pos+1} of ${SEND_ALL.queue.length}</b> &middot; `
-    + `Opened a draft for <b>${c.name}</b> at <b>${l.company}</b> — send it in Outlook, then:`
-    + `<button class="fu-btn positive" onclick="coldSendAllNext()">Sent &mdash; next &rsaquo;</button>`
+    + `Ready to send to <b>${c.name}</b> at <b>${l.company}</b> - review the draft above, then:`
+    + `<button class="fu-btn positive" onclick="coldSendRealEmail('${brand}',${idx},${ci},this)">📧 Send now</button>`
     + `<button class="fu-btn" onclick="coldSendAllSkip()">Skip this one</button>`
     + `<button class="fu-btn" onclick="coldSendAllStop()">Stop</button>`);
-}
-function coldSendAllNext(){
-  if(!SEND_ALL || SEND_ALL.kind!=='coldlead') return;
-  const { brand, idx } = SEND_ALL;
-  const ci = SEND_ALL.queue[SEND_ALL.pos];
-  startFollowUp(brand, idx, ci); // marks it sent + starts the cascade, same as the manual button
-  SEND_ALL.pos++;
-  coldSendAllAdvance();
 }
 function coldSendAllSkip(){
   if(!SEND_ALL || SEND_ALL.kind!=='coldlead') return;
@@ -5248,7 +5287,7 @@ ${bullets}
 function msGreeting(p, first, opener){
   return `<p style="${p}">Hi ${first},</p>
 ${msGap(4)}
-<p style="${p}">${opener}</p>
+<p style="${p}" class="ms-editzone" contenteditable="true" data-msedit="opener" spellcheck="true">${opener}</p>
 ${msGap(7)}`;
 }
 
@@ -5325,7 +5364,7 @@ ${hero}
 ${meta}
 </td></tr>
 <tr><td style="padding:20px 24px 4px 24px; mso-padding-alt:20px 24px 4px 24px;">
-<p style="font-family:${A}; font-size:14px; color:#555555; line-height:1.6; margin:0 0 14px 0; mso-margin-bottom-alt:14px;">${c.standfirst}</p>
+<p style="font-family:${A}; font-size:14px; color:#555555; line-height:1.6; margin:0 0 14px 0; mso-margin-bottom-alt:14px;" class="ms-editzone" contenteditable="true" data-msedit="standfirst" spellcheck="true">${c.standfirst}</p>
 </td></tr>
 <tr><td style="padding:0 24px 20px 24px; mso-padding-alt:0 24px 20px 24px;">
 <div style="font-family:${A}; font-size:11px; color:${TAPFLO_BLUE}; font-weight:bold; letter-spacing:1px; padding-bottom:8px;">${insideLabel}</div>
@@ -5338,7 +5377,7 @@ ${extraA}
 </table>
 </td></tr>
 <tr><td style="padding:18px 32px 30px 32px; mso-padding-alt:18px 32px 30px 32px; text-align:left;">
-<p style="margin:0; mso-margin-bottom-alt:0; font-family:${A}; font-size:15px; font-weight:bold; line-height:1.5; text-align:left;"><a href="https://www.tapflopumps.co.uk/contact-us/" style="color:${TAPFLO_BLUE}; text-decoration:underline;"><span style="color:${TAPFLO_BLUE};">${c.cta} &rsaquo;</span></a></p>
+<p style="margin:0; mso-margin-bottom-alt:0; font-family:${A}; font-size:15px; font-weight:bold; line-height:1.5; text-align:left;"><a href="https://www.tapflopumps.co.uk/contact-us/" style="color:${TAPFLO_BLUE}; text-decoration:underline;"><span style="color:${TAPFLO_BLUE};"><span class="ms-editzone" contenteditable="true" data-msedit="cta" spellcheck="true">${c.cta}</span> &rsaquo;</span></a></p>
 </td></tr>
 </table>
 </td></tr></table>`;
@@ -5438,6 +5477,10 @@ const MS_RCPT = {};
    MS_SENT is written into the portal state on save, so a tick survives a reload
    the same way a follow-up click does. */
 const MS_SUBJECT = {};
+// Hand-edited opener/standfirst/CTA text per row - {opener, standfirst, cta},
+// only the keys actually edited. Same session-only pattern as MS_SUBJECT
+// above; applied onto the row's own suggestion object in msFillBody.
+const MS_BODY_EDITS = {};
 
 /* 11/09, the picture picker. MS_PIC holds the filename Aidan chose for a row and
    MS_PIC_PAGE how far he has shuffled. Both are per row, because two companies
@@ -5658,6 +5701,65 @@ function msSubjectEdited(id, el){
   const link = el.closest('.ms-mail') && el.closest('.ms-mail').querySelector('a.ms-lite[href^="mailto:"]');
   if(link) link.href = 'mailto:' + link.dataset.mmTo + '?subject=' + encodeURIComponent(el.value);
 }
+// One of the three contenteditable zones (opener/standfirst/cta, see
+// msGreeting/buildBrandedMailshot) was hand-edited. Stored as plain text,
+// not innerHTML - these are single-line/paragraph zones with no inline
+// markup of their own, and a keydown handler below blocks Enter inside them
+// so contenteditable never gets the chance to insert a stray <div>/<br>.
+function msBodyZoneEdited(el){
+  const rowEl = el.closest('[data-mmrow]');
+  const zone = el.getAttribute('data-msedit');
+  if(!rowEl || !zone) return;
+  const id = rowEl.getAttribute('data-mmrow');
+  if(!MS_BODY_EDITS[id]) MS_BODY_EDITS[id] = {};
+  MS_BODY_EDITS[id][zone] = el.textContent;
+}
+// Real send, straight from the signed-in rep's own connected mailbox via
+// Microsoft Graph (see /api/outlook/send, src/shared/outlookMail.js) -
+// reads whatever's actually on screen at the moment of clicking, edits
+// included, rather than recomputing the default subject/body from scratch.
+async function msSendRealEmail(rowId, ix, btn){
+  const row = MAILSHOT_MATCHED.find(x=>x.id===rowId);
+  if(!row) return;
+  const who = msRecipients(row)[ix];
+  if(!who) return;
+  const panel = document.querySelector(`[data-mmbody="${rowId}"] .ms-mail`);
+  const subjInput = panel && panel.querySelector('.ms-subj-input');
+  const bodyEl = panel && document.getElementById(`msmail-${msToSuggestion(row, who).id}`);
+  if(!subjInput || !bodyEl) return;
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try{
+    const res = await fetch('/api/outlook/send', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({to: who[0], subject: subjInput.value, body: bodyEl.innerHTML, contentType: 'HTML'}),
+    });
+    const result = await res.json();
+    if(!result.sent){
+      const msg = result.reason === 'not_connected'
+        ? 'Connect Outlook first (see the Connections page) to send from here.'
+        : 'Send failed' + (result.detail ? ': ' + result.detail.slice(0,200) : '')
+          + ' - if your Outlook connection predates this feature, reconnecting it (Connections page) usually fixes this.';
+      alert(msg);
+      btn.disabled = false; btn.textContent = label;
+      return;
+    }
+    msSendAllMark(row, who);
+    msFillBody(row);
+    renderMailshotMatched();
+    // Part of the "Send all" walk (see msSendAllAdvance) - a real send IS the
+    // confirmation now, so it advances the queue itself rather than waiting
+    // on a separate "Sent, next" click for something that already happened.
+    if(SEND_ALL && SEND_ALL.kind === 'mailshot' && SEND_ALL.queue[SEND_ALL.pos]
+       && SEND_ALL.queue[SEND_ALL.pos].rowId === rowId && SEND_ALL.queue[SEND_ALL.pos].ix === ix){
+      SEND_ALL.pos++;
+      msSendAllAdvance();
+    }
+  }catch(e){
+    alert('Send failed - network error.');
+    btn.disabled = false; btn.textContent = label;
+  }
+}
 function msSentKey(r, email){ return r.id + '|' + email; }
 function msIsSent(r, email){ return !!MS_SENT[msSentKey(r, email)]; }
 function msSentCount(r){
@@ -5794,6 +5896,16 @@ function msFillBody(r){
   const sel  = Math.min(MS_RCPT[r.id] || 0, list.length - 1);
   const who  = list[sel];
   const s = msToSuggestion(r, who);
+  // Hand-edited opener/standfirst/CTA text, if any - applied onto this row's
+  // own suggestion object (a fresh literal from msToSuggestion, never the
+  // shared MAILSHOT_CONTENT template) so an edit here can never leak into a
+  // different company sent the same content piece.
+  const bodyEdits = MS_BODY_EDITS[r.id];
+  if(bodyEdits){
+    if(bodyEdits.opener != null) s.content.opener = bodyEdits.opener;
+    if(bodyEdits.standfirst != null) s.content.standfirst = bodyEdits.standfirst;
+    if(bodyEdits.cta != null) s.content.cta = bodyEdits.cta;
+  }
   const c = msContentFor(r);
   const alts = msAlternatives(r);
   const next = alts.length ? alts[0] : null;
@@ -5903,6 +6015,7 @@ function msFillBody(r){
       <div class="ms-bar">
         <div class="ms-subj"><b>Subject:</b>
           <input class="ms-subj-input" value="${subject.replace(/"/g,'&quot;')}" oninput="msSubjectEdited('${r.id}', this)"></div>
+        <button class="copy-btn"${sentNow?' disabled':''} onclick="msSendRealEmail('${r.id}', ${sel}, this)">📧 Send Email</button>
         <button class="ms-copy" data-mscopy="msmail-${s.id}" data-msmailto="${mailto}">Copy for Outlook</button>
         <button class="mm-sent${sentNow?' done':''}" data-mmsent="${r.id}|${sel}">${sentNow
           ? '&#10003; Sent '+(sentRec && sentRec.date ? sentRec.date : '')
@@ -5911,10 +6024,12 @@ function msFillBody(r){
       <div class="ms-bar ms-subbar">
         <a class="ms-lite" href="${mailto}" data-mm-to="${who[0]}">Open empty draft</a>
         <button class="ms-lite" data-mssrc="msmail-${s.id}">Copy source</button>
-        <span class="ms-hint">Copies the email <b>formatted</b>, then opens a draft to
-          ${who[0]} with the subject filled in. Put the cursor in the body and press Ctrl+V.</span>
+        <span class="ms-hint">Send Email transmits it for real, straight from your own connected
+          mailbox - no copy/paste needed. The intro line, standfirst and "talk to us" wording below
+          (dashed outline) are editable in place; everything else stays as designed. Copy for
+          Outlook/Open empty draft are still there if you'd rather send it yourself.</span>
       </div>
-      <div class="ms-scroll ms-plain"><div id="msmail-${s.id}">${body}</div></div>
+      <div class="ms-scroll ms-plain"><div id="msmail-${s.id}" data-mmrow="${r.id}">${body}</div></div>
     </div>
   </div>`;
   host.dataset.filled = '1';
@@ -6014,6 +6129,21 @@ document.addEventListener('input', function(ev){
   if(!row) return;
   MS_PAGEQ[id] = el.value;
   msRedrawPageSearch(row);
+});
+
+// The mailshot body's editable zones (opener/standfirst/cta) - contenteditable
+// rather than an <input>/<textarea>, since they sit inline inside the real
+// HTML email markup. Enter is blocked so a zone stays the single paragraph/
+// span it was, never gaining a stray <div>/<br> contenteditable likes to
+// insert on its own.
+document.addEventListener('input', function(ev){
+  const el = ev.target;
+  if(!el || !el.hasAttribute || !el.hasAttribute('data-msedit')) return;
+  msBodyZoneEdited(el);
+});
+document.addEventListener('keydown', function(ev){
+  const el = ev.target;
+  if(el && el.hasAttribute && el.hasAttribute('data-msedit') && ev.key === 'Enter') ev.preventDefault();
 });
 
 document.addEventListener('click', function(ev){
@@ -6331,19 +6461,14 @@ function msSendAllAdvance(){
   const rowEl = document.querySelector(`.mm-row[data-mmid="${row.id}"]`);
   if(rowEl) rowEl.scrollIntoView({behavior:'smooth', block:'center'});
 
-  // Fires the exact same clipboard code the Copy for Outlook button fires
-  // (see the document-level 'copy' listener above) — one code path, so what
-  // lands in Outlook here is identical to a manual click. Done synchronously,
-  // in the same call stack as the Send All / Next button press, because
-  // document.execCommand('copy') needs a real user gesture behind it and a
-  // setTimeout would lose that.
-  const copyBtn = body ? body.querySelector('.ms-copy') : null;
-  if(copyBtn) copyBtn.click();
-
+  // 18 Sep: real sending replaced the old copy-for-Outlook-then-click-"Sent,
+  // next" step - clicking Send here calls the exact same msSendRealEmail
+  // used on a single row, which advances this queue itself on success (see
+  // there). Still one deliberate click per recipient, on purpose - a real
+  // email can't be unsent, so nothing here auto-fires the rest of the queue.
   sendAllBarShow(`<b>${SEND_ALL.pos+1} of ${SEND_ALL.queue.length}</b> &middot; `
-    + `Copied for <b>${(who[1]||who[0])}</b> at <b>${row.co}</b> — paste into the Outlook draft `
-    + `that just opened (Ctrl+V) and send it, then:`
-    + `<button class="fu-btn positive" onclick="msSendAllNext()">Sent &mdash; next &rsaquo;</button>`
+    + `Ready to send to <b>${(who[1]||who[0])}</b> at <b>${row.co}</b> - review it above, then:`
+    + `<button class="fu-btn positive" onclick="msSendRealEmail('${row.id}', ${item.ix}, this)">📧 Send now</button>`
     + `<button class="fu-btn" onclick="msSendAllSkip()">Skip this one</button>`
     + `<button class="fu-btn" onclick="msSendAllStop()">Stop</button>`);
 }
@@ -6358,14 +6483,6 @@ function msSendAllMark(row, who){
                     to: who[0], company: row.co};
   }
   if(typeof persistMailshotSent === 'function') persistMailshotSent();
-}
-function msSendAllNext(){
-  if(!SEND_ALL) return;
-  const item = SEND_ALL.queue[SEND_ALL.pos];
-  const row = MAILSHOT_MATCHED.find(r=>r.id===item.rowId);
-  if(row){ const who = msRecipients(row)[item.ix]; if(who) msSendAllMark(row, who); }
-  SEND_ALL.pos++;
-  msSendAllAdvance();
 }
 function msSendAllSkip(){
   if(!SEND_ALL) return;

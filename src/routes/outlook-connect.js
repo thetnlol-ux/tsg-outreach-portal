@@ -6,7 +6,11 @@ import { pkcePair } from "../shared/msjwt.js";
 // portal read their own mailbox too. Same Microsoft app registration,
 // wider scopes, its own redirect address so the two flows don't get
 // confused with each other.
-const SCOPES = "openid offline_access Mail.Read Calendars.Read User.Read";
+// 18 Sep: added Mail.Send for real sending from Suggested Mailshots/the Cold
+// Lead Action Desk (see sendOutlookMail in outlookMail.js) - anyone already
+// connected needs to reconnect once to grant it; Graph won't hand out a
+// token for a scope it was never asked for, refresh included.
+const SCOPES = "openid offline_access Mail.Read Mail.Send Calendars.Read User.Read";
 
 export async function handleOutlookConnect(request, env) {
   const session = await verifySession(readCookie(request, "session"), env.SESSION_SECRET);

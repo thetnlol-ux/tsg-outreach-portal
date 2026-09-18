@@ -13,6 +13,7 @@ import { handleOutlookCallback } from "./routes/outlook-callback.js";
 import { handleDisconnectSalesforce, handleDisconnectOutlook } from "./routes/disconnect.js";
 import { handleSalesforceCheckAccount } from "./routes/salesforce-check-account.js";
 import { handleOutlookCheckContact } from "./routes/outlook-check-contact.js";
+import { handleOutlookSend } from "./routes/outlook-send.js";
 import { handleZoomInfoSourceLeads } from "./routes/zoominfo-source-leads.js";
 import { handleLeadForensicsSync, runLeadForensicsSync } from "./routes/leadforensics-sync.js";
 import { handleGetLeadForensicsVisits } from "./routes/leadforensics-visits.js";
@@ -83,6 +84,11 @@ export default {
     if (url.pathname === "/api/outlook/check-contact") {
       if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
       return handleOutlookCheckContact(request, env);
+    }
+
+    if (url.pathname === "/api/outlook/send") {
+      if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+      return handleOutlookSend(request, env);
     }
 
     if (url.pathname === "/api/zoominfo/source-leads") {

@@ -5,7 +5,9 @@
 import { buildClientAssertion } from "./msjwt.js";
 
 const TOKEN_ENDPOINT = "https://login.microsoftonline.com/organizations/oauth2/v2.0/token";
-const SCOPES = "openid offline_access Mail.Read Calendars.Read User.Read";
+// Kept identical to outlook-connect.js/outlook-callback.js's SCOPES - a
+// refresh has to ask for exactly what the original connection granted.
+const SCOPES = "openid offline_access Mail.Read Mail.Send Calendars.Read User.Read";
 
 export async function refreshOutlookToken(env, connection) {
   const clientAssertion = await buildClientAssertion({
@@ -78,6 +80,47 @@ export async function fetchRecentCorrespondence(env, userId, contactEmail, limit
     .first();
   if (!connection) return null;
   return searchOneMailbox(env, userId, connection, contactEmail, limit);
+}
+
+// Real sending via Graph's /me/sendMail - the "Send Email" button on
+// Suggested Mailshots and the Cold Lead Action Desk. Always sends as the
+// signed-in rep's own connected mailbox (never a shared/service identity),
+// so it lands in their own Sent Items exactly like a hand-sent email would -
+// which is what the rest of this portal already relies on for follow-up/
+// mailshot dedupe. Needs the Mail.Send scope (see SCOPES above); a
+// connection made before this was added won't have it and has to be
+// reconnected once. Throws on failure rather than degrading, unlike the
+// read-only helpers below - this is an explicit user action that needs to
+// report success or failure honestly, not a best-effort background check.
+export async function sendOutlookMail(env, userId, connection, { to, subject, body, contentType = "HTML" }) {
+  const payload = {
+    message: {
+      subject,
+      body: { contentType, content: body },
+      toRecipients: [{ emailAddress: { address: to } }],
+    },
+    saveToSentItems: true,
+  };
+  const send = (token) =>
+    fetch("https://graph.microsoft.com/v1.0/me/sendMail", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+  let res = await send(connection.access_token);
+  if (res.status === 401) {
+    const refreshed = await refreshOutlookToken(env, connection);
+    await env.DB.prepare(
+      "UPDATE outlook_connections SET access_token = ?, refresh_token = ?, updated_at = datetime('now') WHERE user_id = ?"
+    )
+      .bind(refreshed.accessToken, refreshed.refreshToken, userId)
+      .run();
+    res = await send(refreshed.accessToken);
+  }
+  if (!res.ok) {
+    throw new Error(`Outlook send failed (${res.status}): ${await res.text()}`);
+  }
 }
 
 // The "Sent Items, across Aidan, Jay and Beth" dedupe gate from the real

@@ -2,7 +2,9 @@ import { buildClientAssertion, decodeJwtPayload } from "../shared/msjwt.js";
 import { verifySession, readCookie } from "../shared/session.js";
 
 const TOKEN_ENDPOINT = "https://login.microsoftonline.com/organizations/oauth2/v2.0/token";
-const SCOPES = "openid offline_access Mail.Read Calendars.Read User.Read";
+// Kept identical to outlook-connect.js's SCOPES - the token exchange has to
+// ask for exactly what the authorize step already asked for.
+const SCOPES = "openid offline_access Mail.Read Mail.Send Calendars.Read User.Read";
 
 export async function handleOutlookCallback(request, env) {
   const session = await verifySession(readCookie(request, "session"), env.SESSION_SECRET);
