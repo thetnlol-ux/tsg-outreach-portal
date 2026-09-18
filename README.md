@@ -91,13 +91,30 @@ Separate from, and does not touch, the `tsg-portal` repo/Worker/database.
     noted honestly on every contact rather than pretending the real rule
     was followed.
   - **Scoring genuinely varies now**: job role match (core vs secondary
-    title for the sector), industry/application fit (fixed per sector,
-    reflecting how directly that sector's real duties match Tapflo's
-    product range per the methodology), a real news/funding check against
-    ZoomInfo's Scoops endpoint (most companies still score 0 — confirmed
-    for real, only a minority of UK SMEs have any Scoops coverage at all),
-    and customer-profile match (similarity to that sector's real end-user
-    closed-won base, not a restatement of the Salesforce dedupe outcome).
+    title for the sector — judged by Claude for real functional fit, not a
+    literal keyword match, see below), industry/application fit (fixed per
+    sector, reflecting how directly that sector's real duties match
+    Tapflo's product range per the methodology), a real news/funding check
+    against ZoomInfo's Scoops endpoint (most companies still score 0 —
+    confirmed for real, only a minority of UK SMEs have any Scoops coverage
+    at all), and customer-profile match (a real per-company similarity
+    score to that sector's real end-user closed-won base, also judged by
+    Claude — not a restatement of the Salesforce dedupe outcome and not a
+    flat per-sector number).
+  - **`src/shared/claudeJudge.js`** — the one place in this pipeline that
+    calls the Claude API (`claude-haiku-4-5-20251001`, via `tool_choice` for
+    a structured response), scoped deliberately narrowly: judging real job
+    titles against a sector's target roles, and scoring a company's
+    resemblance to that sector's actual closed-won reference companies
+    (`wonBusinessRef` in `SECTORS`). Every dedupe gate (Salesforce/board/
+    Sent Items) stays plain deterministic matching on purpose — those need
+    to stay exact, since a false positive there means re-contacting an
+    existing customer, which an LLM has no business getting probabilistic
+    about. Needs the `ANTHROPIC_API_KEY` secret (Cloudflare dashboard, same
+    pattern as `LEADFORENSICS_API_KEY`); without it, or if the call fails,
+    role matching falls back to the old keyword check and customer-profile
+    score falls back to the sector's flat ceiling — same best-effort
+    resilience as every other gate here, never a reason to skip a company.
   Worth knowing: unlike the free checks above, this **spends real
   ZoomInfo credits** — contact enrichment (`/contacts/enrich`) is a paid,
   per-contact call, capped at 15 new candidates per click regardless of

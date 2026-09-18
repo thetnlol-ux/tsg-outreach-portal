@@ -3,6 +3,7 @@ import { searchCompaniesByCriteria, searchContacts, enrichContacts, searchScoops
 import { resolveSalesforceOrg } from "../shared/salesforceOrgs.js";
 import { runSoql } from "../shared/salesforce.js";
 import { fetchCorrespondenceAcrossConnectedMailboxes } from "../shared/outlookMail.js";
+import { judgeLeadFit } from "../shared/claudeJudge.js";
 
 // Sources fresh Tapflo cold leads from ZoomInfo when the board runs low —
 // the automated half of the "top the desk back up to 50 whenever it drops
@@ -55,6 +56,11 @@ const EMPLOYEE_BUCKETS = "50to99,100to249,250to499"; // 94% of the real desk sit
 // industryKeywords terms combined into one call. Only the three sectors
 // currently under their target share (see the file comment above); no
 // food/drink or pharma keywords, both at or over target already.
+// wonBusinessRef/description feed judgeLeadFit (see ../shared/claudeJudge.js)
+// - the real closed-won reference companies and sector duties the
+// methodology doc names, now given to Claude as grounding context instead
+// of living only in a code comment nobody but a human reading the source
+// ever saw.
 const SECTORS = {
   chemical: {
     keywords: ["chemicals", "coatings", "adhesives", "lubricants"],
@@ -62,7 +68,9 @@ const SECTORS = {
     secondaryRoleKeywords: ["production manager", "technical manager", "engineering", "engineer"],
     industryMatchScore: 18, // "at least as strong as food and drink in the won business" - Holchem, Ecolab, Everbuild
     applicationMatchScore: 12, // solvent/resin transfer, ATEX zoning, drum & IBC decanting - explicitly named in section 4b
-    customerProfileScore: 20,
+    customerProfileScore: 20, // ceiling - the per-candidate value is judged by Claude, see judgeLeadFit
+    wonBusinessRef: ["Holchem", "Ecolab", "Everbuild"],
+    description: "chemical manufacturing (coatings, adhesives, lubricants) - solvent/resin transfer, ATEX zoning, drum & IBC decanting",
   },
   industrial: {
     keywords: ["plating", "quarrying"],
@@ -70,7 +78,9 @@ const SECTORS = {
     secondaryRoleKeywords: ["production engineer", "works manager", "engineer"],
     industryMatchScore: 14, // "the weakest defined sector on the board... needs the tightest definition"
     applicationMatchScore: 12, // abrasives/solids on centrifugal pumps - peristaltic/AODD territory
-    customerProfileScore: 10,
+    customerProfileScore: 10, // ceiling - the per-candidate value is judged by Claude, see judgeLeadFit
+    wonBusinessRef: [], // the weakest-defined sector on the board - no confirmed closed-won reference yet, score conservatively
+    description: "plating and quarrying - abrasives/solids handling on centrifugal pumps, peristaltic/AODD territory",
   },
   waste: {
     keywords: ["recycling", "wastewater", "waste"],
@@ -78,7 +88,9 @@ const SECTORS = {
     secondaryRoleKeywords: ["works manager", "technical services manager", "operations manager", "operations"],
     industryMatchScore: 16, // "under-worked" but proven - Allwater, Castle Environmental, Olleco
     applicationMatchScore: 14, // sludge/lime/polymer/ferric dosing - "the strongest single product story outside hygienic"
-    customerProfileScore: 15,
+    customerProfileScore: 15, // ceiling - the per-candidate value is judged by Claude, see judgeLeadFit
+    wonBusinessRef: ["Allwater", "Castle Environmental", "Olleco"],
+    description: "waste, wastewater and recycling - sludge/lime/polymer/ferric dosing",
   },
 };
 
@@ -259,10 +271,34 @@ export async function handleZoomInfoSourceLeads(request, env) {
         }
         if (contactsFound.size === 0) continue; // no matching role found here - not worth sourcing
 
+        // Claude judges real functional fit (e.g. "Head of Engineering &
+        // Maintenance" as a genuine core match despite not containing any
+        // listed phrase) instead of a literal substring check, plus a real
+        // per-company customerProfileScore instead of this sector's flat
+        // ceiling. Best-effort: falls back to the old substring match and
+        // the sector's static ceiling if the API key isn't set or the call
+        // fails - same "unchecked, not wrong" pattern as every other gate
+        // here, not a reason to skip the company.
+        const distinctTitles = [...new Set([...contactsFound.values()].map((m) => m.jobTitle).filter(Boolean))];
+        let judged = null;
+        try {
+          judged = await judgeLeadFit(env, {
+            sectorKey, sectorDef, titles: distinctTitles,
+            companyName: name, city: co.attributes.city, state: co.attributes.state,
+            employeeCount: co.attributes.employeeCount,
+          });
+        } catch (e) {
+          // couldn't judge via Claude - fall through to the deterministic path below
+        }
+        const levelFor = (title) => {
+          if (judged && judged.byTitle.has(title)) return judged.byTitle.get(title);
+          return roleMatchLevel(title, sectorDef);
+        };
+
         // "No weak fallbacks" - only contacts that actually match this
         // sector's role vocabulary survive; nothing else is kept as filler.
         const roleMatched = [...contactsFound.entries()]
-          .map(([id, meta]) => ({ id, meta, level: roleMatchLevel(meta.jobTitle, sectorDef) }))
+          .map(([id, meta]) => ({ id, meta, level: levelFor(meta.jobTitle) }))
           .filter((c) => c.level)
           .sort((a, b) => (b.meta.contactAccuracyScore || 0) - (a.meta.contactAccuracyScore || 0))
           .slice(0, 3);
@@ -333,8 +369,9 @@ export async function handleZoomInfoSourceLeads(request, env) {
         const jobRoleScore = bestRoleLevel === "core" ? 20 : 15;
         const hasPositiveScoop = await realPositiveScoopFound(env, name);
         const newsScore = hasPositiveScoop ? 15 : 0;
+        const customerProfileScore = judged ? judged.customerProfileScore : sectorDef.customerProfileScore;
         const score = jobRoleScore + sectorDef.industryMatchScore + sectorDef.applicationMatchScore
-          + newsScore + sectorDef.customerProfileScore;
+          + newsScore + customerProfileScore;
 
         const gateNotes = [];
         gateNotes.push(salesforceAvailable
@@ -343,6 +380,9 @@ export async function handleZoomInfoSourceLeads(request, env) {
         gateNotes.push(checkedMailboxesSet.size
           ? `Gate 4 (Sent Items): checked ${[...checkedMailboxesSet].join(", ")} — clear.`
           : "Gate 4 (Sent Items): no connected mailboxes were available to check.");
+        gateNotes.push(judged
+          ? `Role match and customer-profile score judged by Claude: ${judged.reasoning}`
+          : "Role match used the keyword fallback and customer-profile score used this sector's default ceiling — Claude judging was unavailable for this candidate.");
 
         candidates.push({
           company: name,
@@ -359,7 +399,7 @@ export async function handleZoomInfoSourceLeads(request, env) {
             ["Product → industry match", sectorDef.industryMatchScore, 20],
             ["Product → application match", sectorDef.applicationMatchScore, 20],
             ["News / funding signal", newsScore, 20],
-            ["Customer profile match", sectorDef.customerProfileScore, 20],
+            ["Customer profile match", customerProfileScore, 20],
           ],
           why: `Auto-sourced on ${todayStr()} via ZoomInfo (${sectorKey} sector, industry keyword "${keyword}", ${co.attributes.employeeCount || "unknown"} employees, UK) — this sector is currently under its target share of the board, per the 18 Sep sourcing methodology. Role match is ${bestRoleLevel === "core" ? "a core title for this sector" : "a secondary but real title for this sector"}. Product-application fit reflects this sector's known duties (see the sourcing methodology, section 4), not a verified read of this specific company's process. ${hasPositiveScoop ? "A real dated ZoomInfo Scoops signal was found for this company." : "No real dated news/funding signal (ZoomInfo Scoops) found for this company."} ${gateNotes.join(" ")} This is a rough placeholder score, well below the bar a hand-researched lead gets — verify before spending real outreach time on it.`,
           news: hasPositiveScoop
